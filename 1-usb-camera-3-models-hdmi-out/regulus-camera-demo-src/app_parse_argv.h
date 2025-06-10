@@ -3,8 +3,8 @@
 
 #include <cstdint>
 #include <cstring>
-#include <vector>
 #include <string>
+#include <vector>
 
 struct ParseResult_dvec_w_h_f {
     std::vector<std::string> dev_paths;

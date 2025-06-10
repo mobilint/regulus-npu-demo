@@ -10,7 +10,7 @@ template <typename T>
 class ThreadSafeQueue {
 public:
     ThreadSafeQueue(int max_size = 1) : mMaxSize(max_size) {}
-    
+
     enum StatusCode {
         OK = 0,
         CLOSED = 1,

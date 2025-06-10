@@ -1,11 +1,11 @@
 #ifndef INIT_MODELS_H_
 #define INIT_MODELS_H_
 
-#include <memory>
-#include <vector>
-
 #include <maccel/maccel.h>
 #include <maccel/type.h>
+
+#include <memory>
+#include <vector>
 
 using mobilint::Accelerator;
 using mobilint::BufferInfo;
@@ -21,6 +21,7 @@ struct InitMaccelResult {
     std::vector<std::unique_ptr<Model>> models;
 };
 
-InitMaccelResult init_3_models(std::string model_path1, std::string model_path2, std::string model_path3);
+InitMaccelResult init_3_models(std::string model_path1, std::string model_path2,
+                               std::string model_path3);
 
 #endif

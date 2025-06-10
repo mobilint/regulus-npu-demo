@@ -5,12 +5,13 @@
 #include <thread>
 
 #include "app_type.h"
+#include "maccel/model.h"
 #include "tsqueue.h"
 
-#include "maccel/model.h"
-
 namespace app {
-    std::thread module_infer(mobilint::Model* model, Buffer &buffer_in, Queue &queue_out, std::atomic<bool> &push_on, std::vector<mobilint::Buffer> &repositioned_buffer);
+std::thread module_infer(mobilint::Model* model, Buffer& buffer_in, Queue& queue_out,
+                         std::atomic<bool>& push_on,
+                         std::vector<mobilint::Buffer>& repositioned_buffer);
 }
 
 #endif

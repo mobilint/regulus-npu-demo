@@ -4,8 +4,8 @@
 #include <opencv2/opencv.hpp>
 
 namespace img {
-    cv::Mat get_mask(cv::Mat frame);
-    cv::Mat get_alpha(cv::Mat frame);
-}
+cv::Mat get_mask(cv::Mat frame);
+cv::Mat get_alpha(cv::Mat frame);
+}  // namespace img
 
 #endif
