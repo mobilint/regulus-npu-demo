@@ -1,13 +1,13 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <cmath>
 #include <csignal>
 #include <iostream>
 #include <map>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <thread>
-#include <cmath>
 
 #include "appsrc_kmssink.h"
 #include "gst/gst.h"
@@ -34,22 +34,19 @@ using mobilint::Model;
 using mobilint::ModelConfig;
 using mobilint::StatusCode;
 
-struct InferItem
-{
+struct InferItem {
     cv::Mat frame;
     std::vector<mobilint::Buffer> buffer;
 };
 
-struct PostItem
-{
+struct PostItem {
     cv::Mat frame;
     std::vector<mobilint::NDArray<float>> result;
 };
 
 std::atomic<bool> push_on(true);
 
-void sigintHandler(int signum)
-{
+void sigintHandler(int signum) {
     cout << "Interrupt signal (" << signum << ") received.\n";
     push_on.store(false);
     exit(-1);
@@ -60,138 +57,123 @@ using InferQueue = ThreadSafeQueue<InferItem>;
 using PostQueue = ThreadSafeQueue<PostItem>;
 using DisplayQueue = ThreadSafeQueue<cv::Mat>;
 
-namespace
-{
-    void work_feed(std::string src_path, PreQueue *pre_queue)
-    {
-        cv::VideoCapture cap;
-        
-        cap.open(src_path);
-        cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-        cap.set(cv::CAP_PROP_FRAME_WIDTH, 960);
-        cap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
-        cap.set(cv::CAP_PROP_FPS, 30);
-        if (!cap.isOpened())
-        {
-            std::cout << "Source Open Error! Checkout argv[1]: " << src_path << std::endl;
-            push_on = false;
-        }
+namespace {
+void work_feed(std::string src_path, PreQueue* pre_queue) {
+    cv::VideoCapture cap;
 
-        while (push_on)
-        {
-            cv::Mat frame;
-            cap >> frame;
-
-            pre_queue->push(frame);
-        }
-
-        pre_queue->close();
+    cap.open(src_path);
+    cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 960);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
+    cap.set(cv::CAP_PROP_FPS, 30);
+    if (!cap.isOpened()) {
+        std::cout << "Source Open Error! Checkout argv[1]: " << src_path << std::endl;
+        push_on = false;
     }
 
-    void work_pre(Model *model, PreQueue *pre_queue, InferQueue *infer_queue)
-    {
-        int crop_w = 512;
-        int crop_h = 640;
-        int i = 0;
+    while (push_on) {
+        cv::Mat frame;
+        cap >> frame;
 
-        std::vector<mobilint::Buffer> repositioned_buffer = model->acquireInputBuffer();
+        pre_queue->push(frame);
+    }
 
-        while (push_on)
-        {
-            cv::Mat frame;
-            auto qsc = pre_queue->pop(frame);
-            if (qsc == PreQueue::StatusCode::CLOSED)
-                break;
+    pre_queue->close();
+}
 
-            cv::Mat resized_frame;
-            int resize_w = frame.cols * 640 / frame.rows;
-            int resize_h = 640;
-            cv::resize(frame, resized_frame, cv::Size(resize_w, resize_h));
+void work_pre(Model* model, PreQueue* pre_queue, InferQueue* infer_queue) {
+    int crop_w = 512;
+    int crop_h = 640;
+    int i = 0;
 
-            cv::Mat cropped_frame;
-            cropped_frame = resized_frame({(int)((resize_w - crop_w) / 2),
-                                           (int)((resize_h - crop_h) / 2), crop_w, crop_h})
-                                .clone();
+    std::vector<mobilint::Buffer> repositioned_buffer = model->acquireInputBuffer();
 
-            cv::Mat pre(crop_h, crop_w, CV_32FC3);
-            for (int i = 0; i < crop_w * crop_h * 3; i++)
-            {
-                ((float *)pre.data)[i] = (float)(cropped_frame.data[i]) / 255.0f;
-            }
+    while (push_on) {
+        cv::Mat frame;
+        auto qsc = pre_queue->pop(frame);
+        if (qsc == PreQueue::StatusCode::CLOSED) break;
 
-            model->repositionInputs({(float *)pre.data}, repositioned_buffer);
+        cv::Mat resized_frame;
+        int resize_w = frame.cols * 640 / frame.rows;
+        int resize_h = 640;
+        cv::resize(frame, resized_frame, cv::Size(resize_w, resize_h));
 
-            infer_queue->push({cropped_frame, repositioned_buffer});
+        cv::Mat cropped_frame;
+        cropped_frame = resized_frame({(int)((resize_w - crop_w) / 2),
+                                       (int)((resize_h - crop_h) / 2), crop_w, crop_h})
+                            .clone();
+
+        cv::Mat pre(crop_h, crop_w, CV_32FC3);
+        for (int i = 0; i < crop_w * crop_h * 3; i++) {
+            ((float*)pre.data)[i] = (float)(cropped_frame.data[i]) / 255.0f;
         }
 
-        pre_queue->close();
-        infer_queue->close();
-        model->releaseBuffer(repositioned_buffer);
+        model->repositionInputs({(float*)pre.data}, repositioned_buffer);
+
+        infer_queue->push({cropped_frame, repositioned_buffer});
     }
 
-    void work_infer(Model *model, InferQueue *infer_queue, PostQueue *post_queue)
-    {
-        StatusCode sc;
-        std::vector<mobilint::NDArray<float>> result;
-        
-        while (push_on)
-        {
-            InferItem item;
-            auto qsc = infer_queue->pop(item);
-            if (qsc == InferQueue::StatusCode::CLOSED)
-                break;
+    pre_queue->close();
+    infer_queue->close();
+    model->releaseBuffer(repositioned_buffer);
+}
 
-            sc = model->inferBufferToFloat(item.buffer, result);
-            if (!sc)
-                exit(1);
+void work_infer(Model* model, InferQueue* infer_queue, PostQueue* post_queue) {
+    StatusCode sc;
+    std::vector<mobilint::NDArray<float>> result;
 
-            post_queue->push({item.frame, result});
-        }
+    while (push_on) {
+        InferItem item;
+        auto qsc = infer_queue->pop(item);
+        if (qsc == InferQueue::StatusCode::CLOSED) break;
 
-        infer_queue->close();
-        post_queue->close();
+        sc = model->inferBufferToFloat(item.buffer, result);
+        if (!sc) exit(1);
+
+        post_queue->push({item.frame, result});
     }
 
-    void work_post(PostQueue *post_queue, DisplayQueue *display_queue)
-    {
-        float face_conf_thres = 0.15;
-        float face_iou_thres = 0.5;
-        int face_nc = 1; // number of classes
-        int face_imh = 640;
-        int face_imw = 512;
+    infer_queue->close();
+    post_queue->close();
+}
 
-        mobilint::postface::YOLOv8FacePostProcessor post(face_nc, face_imh, face_imw, face_conf_thres, face_iou_thres, 1, false);
+void work_post(PostQueue* post_queue, DisplayQueue* display_queue) {
+    float face_conf_thres = 0.15;
+    float face_iou_thres = 0.5;
+    int face_nc = 1;  // number of classes
+    int face_imh = 640;
+    int face_imw = 512;
 
-        while (push_on)
-        {
-            PostItem item;
-            auto qsc = post_queue->pop(item);
-            if (qsc == PostQueue::StatusCode::CLOSED)
-                break;
+    mobilint::postface::YOLOv8FacePostProcessor post(
+        face_nc, face_imh, face_imw, face_conf_thres, face_iou_thres, 1, false);
 
-            std::vector<std::array<float, 4>> boxes;
-            std::vector<float> scores;
-            std::vector<int> labels;
+    while (push_on) {
+        PostItem item;
+        auto qsc = post_queue->pop(item);
+        if (qsc == PostQueue::StatusCode::CLOSED) break;
 
-            uint64_t ticket = post.enqueue(item.frame, item.result, boxes, scores, labels, item.result);
-            post.receive(ticket);
+        std::vector<std::array<float, 4>> boxes;
+        std::vector<float> scores;
+        std::vector<int> labels;
 
-            display_queue->push(item.frame);
-        }
+        uint64_t ticket =
+            post.enqueue(item.frame, item.result, boxes, scores, labels, item.result);
+        post.receive(ticket);
 
-        post_queue->close();
-        display_queue->close();
+        display_queue->push(item.frame);
     }
 
-    void printUsage()
-    {
-        cout << "Usage: demo {Dir path to camera device}, default is \"/dev/video3\n";
-    }
+    post_queue->close();
+    display_queue->close();
+}
 
-} // namespace
+void printUsage() {
+    cout << "Usage: demo {Dir path to camera device}, default is \"/dev/video3\n";
+}
 
-int main(int argc, char *argv[])
-{
+}  // namespace
+
+int main(int argc, char* argv[]) {
     printUsage();
 
     signal(SIGINT, sigintHandler);
@@ -200,16 +182,14 @@ int main(int argc, char *argv[])
 
     StatusCode sc;
     std::unique_ptr<Accelerator> acc = Accelerator::create(sc);
-    if (!sc)
-        exit(1);
+    if (!sc) exit(1);
 
     ModelConfig mc;
     mc.excludeAllCores();
     mc.include(Core::Core0);
     std::unique_ptr<Model> model = Model::create("./face_yolov8n_640_512.mxq", mc, sc);
 
-    if (!sc)
-        exit(1);
+    if (!sc) exit(1);
 
     sc = model->launch(*acc);
 
@@ -220,7 +200,8 @@ int main(int argc, char *argv[])
 
     gst_init(NULL, NULL);
 
-    gst_wrapper::AppsrcKmssinkPipeline gst_pipeline_display("BGR", DISPLAY_WIDTH, DISPLAY_HEIGHT, 30);
+    gst_wrapper::AppsrcKmssinkPipeline gst_pipeline_display("BGR", DISPLAY_WIDTH,
+                                                            DISPLAY_HEIGHT, 30);
 
     gst_pipeline_display.start();
 
@@ -231,13 +212,13 @@ int main(int argc, char *argv[])
 
     cv::Mat display = cv::Mat::zeros(cv::Size(DISPLAY_WIDTH, DISPLAY_HEIGHT), CV_8UC3);
 
-    while (push_on)
-    {
+    while (push_on) {
         cv::Mat frame;
         display_queue.pop(frame);
         frame.copyTo(display({0, 0, 512, 640}));
 
-        gst_wrapper::push_data_to_appsrc(gst_pipeline_display.appsrc, display.data, DISPLAY_WIDTH * DISPLAY_HEIGHT * 3);
+        gst_wrapper::push_data_to_appsrc(gst_pipeline_display.appsrc, display.data,
+                                         DISPLAY_WIDTH * DISPLAY_HEIGHT * 3);
     }
 
     pre_queue.close();

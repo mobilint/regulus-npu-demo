@@ -67,8 +67,9 @@ void mobilint::post::YOLOv8PosePostProcessor::run_postprocess(
     std::vector<int> order = {6, 8, 5, 4, 7, 3, 1, 2, 0};
 
     for (int i = 0; i < m_nl; i++) {
-        decode_conf_thres(npu_outs[order[3 * i]], npu_outs[order[3 * i + 1]], m_grids[i], m_strides[i], pred_boxes,
-                          pred_conf, pred_label, pred_scores, npu_outs[order[3 * i + 2]], pred_extra);
+        decode_conf_thres(npu_outs[order[3 * i]], npu_outs[order[3 * i + 1]], m_grids[i],
+                          m_strides[i], pred_boxes, pred_conf, pred_label, pred_scores,
+                          npu_outs[order[3 * i + 2]], pred_extra);
     }
 
     xywh2xyxy(pred_boxes);

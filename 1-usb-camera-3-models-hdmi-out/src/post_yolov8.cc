@@ -247,7 +247,8 @@ void mobilint::post::YOLOv8PostProcessor::decode_extra(const std::vector<float>&
         Decoding and masking with conf threshold
 */
 void mobilint::post::YOLOv8PostProcessor::decode_conf_thres(
-    const std::vector<float>& npu_out_box, const std::vector<float>& npu_out_cls, const std::vector<int>& grid, int stride,
+    const std::vector<float>& npu_out_box, const std::vector<float>& npu_out_cls,
+    const std::vector<int>& grid, int stride,
     std::vector<std::array<float, 4>>& pred_boxes, std::vector<float>& pred_conf,
     std::vector<int>& pred_label, std::vector<std::pair<float, int>>& pred_scores,
     const std::vector<float>& extra, std::vector<std::vector<float>>& pred_extra) {
@@ -264,7 +265,6 @@ void mobilint::post::YOLOv8PostProcessor::decode_conf_thres(
 #pragma omp parallel for num_threads(mOpenmpThreadCount) \
     shared(pred_boxes, pred_conf, pred_label, pred_scores, pred_extra)
     for (int i = 0; i < grid_h * grid_w; i++) {
-        
         std::array<float, 4> pred_box = {-999, -999, -999, -999};
         std::vector<float> pred_extra_values;
         for (int j = 0; j < m_nc; j++) {
@@ -379,8 +379,9 @@ void mobilint::post::YOLOv8PostProcessor::run_postprocess(
     std::vector<float> extra;
 
     for (int i = 0; i < m_nl; i++) {
-        decode_conf_thres(npu_outs[4 - 2 * i], npu_outs[5 - 2 * i], m_grids[i], m_strides[i], pred_boxes, pred_conf,
-                          pred_label, pred_scores, extra, pred_extra);
+        decode_conf_thres(npu_outs[4 - 2 * i], npu_outs[5 - 2 * i], m_grids[i],
+                          m_strides[i], pred_boxes, pred_conf, pred_label, pred_scores,
+                          extra, pred_extra);
     }
 
     xywh2xyxy(pred_boxes);
@@ -443,14 +444,13 @@ void mobilint::post::YOLOv8PostProcessor::plot_boxes(
         cv::Scalar clr(bgr[0], bgr[1], bgr[2]);
         cv::rectangle(im, rect, clr, 2);
 
-	if (m_nc != 1) {
-	    double font_scale = std::min(std::max(rect.width / 500.0, 0.35), 0.99) * 1.3;
-	    std::string desc =
-		COCO_LABELS[labels[i]] + " " + std::to_string((int)(scores[i] * 100)) +
-		"%";
-	    cv::putText(im, desc, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX,
-			font_scale, clr, 2, false);
-	}
+        if (m_nc != 1) {
+            double font_scale = std::min(std::max(rect.width / 500.0, 0.35), 0.99) * 1.3;
+            std::string desc = COCO_LABELS[labels[i]] + " " +
+                               std::to_string((int)(scores[i] * 100)) + "%";
+            cv::putText(im, desc, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX,
+                        font_scale, clr, 2, false);
+        }
     }
 }
 

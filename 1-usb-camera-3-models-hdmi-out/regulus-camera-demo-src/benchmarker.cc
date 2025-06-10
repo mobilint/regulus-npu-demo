@@ -1,7 +1,7 @@
+#include "benchmarker.h"
+
 #include <array>
 #include <chrono>
-
-#include "benchmarker.h"
 
 Benchmarker::Benchmarker() {
     mCreated = Clock::now();
@@ -14,7 +14,7 @@ void Benchmarker::end() {
     std::chrono::duration<float> dt = Clock::now() - mPrev;
 
     if (mCount >= SIZE) {
-	mSum -= mTimes[mCount % SIZE];
+        mSum -= mTimes[mCount % SIZE];
     }
 
     float t = dt.count();
@@ -25,7 +25,7 @@ void Benchmarker::end() {
 
 float Benchmarker::getSec() const {
     if (mCount == 0) {
-	return 0;
+        return 0;
     }
 
     return mSum / (SIZE < mCount ? SIZE : mCount);
@@ -35,7 +35,7 @@ float Benchmarker::getFPS() const {
     float avg_time = getSec();
 
     if (avg_time == 0) {
-	return 0;
+        return 0;
     }
     return 1 / avg_time;
 }
