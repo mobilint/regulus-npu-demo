@@ -1,0 +1,13 @@
+---
+Language: Cpp
+BasedOnStyle: Google
+
+AccessModifierOffset: -4
+ColumnLimit: 90
+DerivePointerAlignment: false
+ForEachMacros: ["MOBILINT_OMP_FOR"]
+IndentCaseLabels: false
+IndentWidth: 4
+PointerAlignment: Left
+StatementMacros: ["MOBILINT_OMP_PARALLEL"]
+...
