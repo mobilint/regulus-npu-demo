@@ -12,6 +12,6 @@
    ```
 3. Run demo
    ```
-   Suppose that step 1 gave you /dev/video4
+   Suppose that step 2 gave you /dev/video4
    ./demo -d 4
    ```
