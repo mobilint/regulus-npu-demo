@@ -2,7 +2,7 @@
 
 ## 1. build
 
-`compile.sh` 의 environment 버전 및 경로 확인
+Check the environment version and path in compile.sh
 ```
 source /opt/crosstools/mobilint/1.0.0/v3.2.1/environment-setup-cortexa53-mobilint-linux
 ```
@@ -10,7 +10,7 @@ source /opt/crosstools/mobilint/1.0.0/v3.2.1/environment-setup-cortexa53-mobilin
 $ ./compile.sh
 ```
 
-ssh 등을 통해 빌드된 binary 파일을 regulus로 전송해 실행
+Transfer the built binary to regulus and run it.
 
 ## 2. Inference
 
