@@ -75,10 +75,9 @@ void mobilint::post::PostProcessor::nms(
             for (int j = i; j < (int)pred_scores.size(); j++) {
                 int temp_idx = pred_scores[j].second;
                 const std::array<float, 4>& temp_box = pred_boxes[temp_idx];
-                float iou = get_iou(max_box, temp_box);
-
-                if (iou > m_iou_thres && pred_labels[idx] == pred_labels[temp_idx]) {
-                    pred_scores[j].first = -99;  // mark the invalid boxes
+                if (pred_labels[idx] == pred_labels[temp_idx]) {
+                    float iou = get_iou(max_box, temp_box);
+                    if (iou > m_iou_thres) pred_scores[j].first = -99;
                 }
             }
 
@@ -112,10 +111,9 @@ void mobilint::post::PostProcessor::nms(
             for (int j = i; j < (int)pred_scores.size(); j++) {
                 int temp_idx = pred_scores[j].second;
                 const std::array<float, 4>& temp_box = pred_boxes[temp_idx];
-                float iou = get_iou(max_box, temp_box);
-
-                if (iou > m_iou_thres && pred_labels[idx] == pred_labels[temp_idx]) {
-                    pred_scores[j].first = -99;  // mark the invalid boxes
+                if (pred_labels[idx] == pred_labels[temp_idx]) {
+                    float iou = get_iou(max_box, temp_box);
+                    if (iou > m_iou_thres) pred_scores[j].first = -99;
                 }
             }
 

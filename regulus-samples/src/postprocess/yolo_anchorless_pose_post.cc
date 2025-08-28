@@ -45,12 +45,12 @@ mobilint::post::YOLOAnchorlessPosePostProcessor::generate_grids(
         int grid_size = grid_h * grid_w * 2;
 
         std::vector<int> grids;
-        for (int j = 0; j < grid_size; j++) {
-            if (j % 2 == 0) {
-                grids.push_back(((int)j / 2) % grid_w);
-            } else {
-                grids.push_back(((int)j / 2) / grid_w);
-            }
+        grids.reserve(grid_size);
+        for (int p = 0; p < grid_h * grid_w; ++p) {
+            int x = p % grid_w;
+            int y = p / grid_w;
+            grids.push_back(x);
+            grids.push_back(y);
         }
 
         all_grids.push_back(grids);
@@ -62,7 +62,7 @@ std::vector<int> mobilint::post::YOLOAnchorlessPosePostProcessor::generate_strid
     int nl) {
     std::vector<int> strides;
     for (int i = 0; i < nl; i++) {
-        strides.push_back(pow(2, 3 + i));
+        strides.push_back(1 << (3 + i));
     }
     return strides;
 }
@@ -74,10 +74,10 @@ void mobilint::post::YOLOAnchorlessPosePostProcessor::decode_boxes(
     const std::vector<float>& npu_out_box, const std::vector<int>& grid, int stride,
     int idx, std::array<float, 4>& pred_box) {
     std::array<float, 4> box;
-    std::array<float, 16> tmp;
     for (int j = 0; j < 4; j++) {
-        for (int k = 0; k < m_reg_max; k++)
-            tmp[k] = npu_out_box[idx * (4 * m_reg_max) + j * m_reg_max + k];
+        const float* base = &npu_out_box[idx * (4 * m_reg_max) + j * m_reg_max];
+        std::array<float, 16> tmp;
+        for (int k = 0; k < m_reg_max; k++) tmp[k] = base[k];
         softmax_inplace(tmp);
 
         float box_value = 0;
@@ -89,11 +89,6 @@ void mobilint::post::YOLOAnchorlessPosePostProcessor::decode_boxes(
     float ymin = grid[idx * 2 + 1] - box[1] + 0.5;
     float xmax = grid[idx * 2 + 0] + box[2] + 0.5;
     float ymax = grid[idx * 2 + 1] + box[3] + 0.5;
-
-    // float x = (xmin + xmax) / 2 * stride;
-    // float y = (ymin + ymax) / 2 * stride;
-    // float w = (xmax - xmin) * stride;
-    // float h = (ymax - ymin) * stride;
 
     pred_box = {xmin * stride, ymin * stride, xmax * stride, ymax * stride};
 }
@@ -197,7 +192,6 @@ void mobilint::post::YOLOAnchorlessPosePostProcessor::run_postprocess(
                           pred_extra);
     }
 
-    // xywh2xyxy(pred_boxes);
     nms(pred_boxes, pred_scores, pred_labels, pred_extra, final_boxes, final_scores,
         final_labels, final_extra);
 

@@ -9,13 +9,16 @@ namespace {
 */
 template <typename FloatContainer>
 void softmax_inplace(FloatContainer& con) {
-    float sum = 0;
-    for (auto v : con) {
-        sum += exp(v);
-    }
+    if (con.empty()) return;
+    auto m = *std::max_element(con.begin(), con.end());
+
+    float sum = 0.f;
     for (auto& v : con) {
-        v = exp(v) / sum;
+        v = exp(v - m);
+        sum += v;
     }
+    float inv = 1.f / sum;
+    for (auto& v : con) v *= inv;
 }
 
 }  // namespace
@@ -75,7 +78,7 @@ mobilint::post::YOLOv8PostProcessor::~YOLOv8PostProcessor() {
 std::vector<int> mobilint::post::YOLOv8PostProcessor::generate_strides(int nl) {
     std::vector<int> strides;
     for (int i = 0; i < nl; i++) {
-        strides.push_back(pow(2, 3 + i));
+        strides.push_back(1 << (3 + i));
     }
     return strides;
 }
@@ -92,12 +95,12 @@ std::vector<std::vector<int>> mobilint::post::YOLOv8PostProcessor::generate_grid
         int grid_size = grid_h * grid_w * 2;
 
         std::vector<int> grids;
-        for (int j = 0; j < grid_size; j++) {
-            if (j % 2 == 0) {
-                grids.push_back(((int)j / 2) % grid_w);
-            } else {
-                grids.push_back(((int)j / 2) / grid_w);
-            }
+        grids.reserve(grid_size);
+        for (int p = 0; p < grid_h * grid_w; ++p) {
+            int x = p % grid_w;
+            int y = p / grid_w;
+            grids.push_back(x);
+            grids.push_back(y);
         }
 
         all_grids.push_back(grids);
@@ -155,11 +158,7 @@ float mobilint::post::YOLOv8PostProcessor::area(float xmin, float ymin, float xm
     float width = xmax - xmin;
     float height = ymax - ymin;
 
-    if (width < 0) return 0;
-
-    if (height < 0) return 0;
-
-    return width * height;
+    return std::max(0.f, width) * std::max(0.f, height);
 }
 
 /*
@@ -208,14 +207,15 @@ void mobilint::post::YOLOv8PostProcessor::decode_boxes(const std::vector<float>&
                                                        int stride, int idx,
                                                        std::array<float, 4>& pred_box) {
     std::array<float, 4> box;
-    std::array<float, 16> tmp;
     for (int j = 0; j < 4; j++) {
+        const float* base = &npu_out[idx * 64 + j * 16];
+        std::array<float, 16> tmp;
         for (int k = 0; k < 16; k++) {
-            tmp[k] = npu_out[idx * 64 + j * 16 + k];
+            tmp[k] = base[k];
         }
         softmax_inplace(tmp);
 
-        float box_value = 0;
+        float box_value = 0.f;
         for (int k = 0; k < 16; k++) box_value += tmp[k] * k;
         box[j] = box_value;
     }
@@ -225,12 +225,7 @@ void mobilint::post::YOLOv8PostProcessor::decode_boxes(const std::vector<float>&
     float xmax = grid[idx * 2 + 0] + box[2] + 0.5;
     float ymax = grid[idx * 2 + 1] + box[3] + 0.5;
 
-    float x = (xmin + xmax) / 2 * stride;
-    float y = (ymin + ymax) / 2 * stride;
-    float w = (xmax - xmin) * stride;
-    float h = (ymax - ymin) * stride;
-
-    pred_box = {x, y, w, h};
+    pred_box = {xmin * stride, ymin * stride, xmax * stride, ymax * stride};
 }
 
 /*
@@ -254,13 +249,6 @@ void mobilint::post::YOLOv8PostProcessor::decode_conf_thres(
     const std::vector<float>& extra, std::vector<std::vector<float>>& pred_extra) {
     int grid_h = m_imh / stride;
     int grid_w = m_imw / stride;
-    int tmp_no = npu_out_cls.size() / (grid_h * grid_w);
-
-    // if (tmp_no != m_nc + 64)  // 64 = 16 * 4
-    //     throw std::invalid_argument(
-    //         "Number of outputs per grid should be 114, "
-    //         "however post-processor received " +
-    //         std::to_string(tmp_no));
 
 #pragma omp parallel for num_threads(mOpenmpThreadCount) \
     shared(pred_boxes, pred_conf, pred_label, pred_scores, pred_extra)
@@ -268,8 +256,8 @@ void mobilint::post::YOLOv8PostProcessor::decode_conf_thres(
         std::array<float, 4> pred_box = {-999, -999, -999, -999};
         std::vector<float> pred_extra_values;
         for (int j = 0; j < m_nc; j++) {
-            if (npu_out_cls[i * tmp_no + j] > m_conf_thres) {
-                float conf = npu_out_cls[i * tmp_no + j];
+            float conf = npu_out_cls[i * m_nc + j];
+            if (conf > m_conf_thres) {
                 if (pred_box[0] == -999) {  // decode box only once
                     decode_boxes(npu_out_box, grid, stride, i, pred_box);
                     decode_extra(extra, grid, stride, i, pred_extra_values);
@@ -312,10 +300,9 @@ void mobilint::post::YOLOv8PostProcessor::nms(
             for (int j = i; j < (int)scores.size(); j++) {
                 int temp_idx = scores[j].second;
                 const std::array<float, 4>& temp_box = pred_boxes[temp_idx];
-                float iou = get_iou(max_box, temp_box);
-
-                if (iou > m_iou_thres && pred_label[idx] == pred_label[temp_idx]) {
-                    scores[j].first = -99;  // mark the invalid boxes
+                if (pred_label[idx] == pred_label[temp_idx]) {
+                    float iou = get_iou(max_box, temp_box);
+                    if (iou > m_iou_thres) scores[j].first = -99;
                 }
             }
 
@@ -364,7 +351,8 @@ void mobilint::post::YOLOv8PostProcessor::run_postprocess(
         throw std::invalid_argument(
             "Size of model outputs does not match "
             "number of detection layers, expected " +
-            std::to_string(m_nl) + " but received " + std::to_string(npu_outs.size()));
+            std::to_string(2 * m_nl) + " but received " +
+            std::to_string(npu_outs.size()));
 
     final_boxes.clear();
     final_scores.clear();
@@ -377,14 +365,14 @@ void mobilint::post::YOLOv8PostProcessor::run_postprocess(
     std::vector<std::pair<float, int>> pred_scores;
     std::vector<std::vector<float>> pred_extra;
     std::vector<float> extra;
+    std::vector<std::pair<int, int>> pairs = {{5, 4}, {3, 2}, {1, 0}};
 
     for (int i = 0; i < m_nl; i++) {
-        decode_conf_thres(npu_outs[4 - 2 * i], npu_outs[5 - 2 * i], m_grids[i],
-                          m_strides[i], pred_boxes, pred_conf, pred_label, pred_scores,
-                          extra, pred_extra);
+        auto [cls_idx, box_idx] = pairs[i];
+        decode_conf_thres(npu_outs[box_idx], npu_outs[cls_idx], m_grids[i], m_strides[i],
+                          pred_boxes, pred_conf, pred_label, pred_scores, extra,
+                          pred_extra);
     }
-
-    xywh2xyxy(pred_boxes);
 
     nms(pred_boxes, pred_conf, pred_label, pred_scores, pred_extra, final_boxes,
         final_scores, final_labels, final_extra);

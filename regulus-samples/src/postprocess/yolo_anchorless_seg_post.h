@@ -38,7 +38,7 @@ public:
     std::vector<int> generate_strides(int nl);
 
     std::vector<std::array<float, 4>> downsample_boxes(
-        std::vector<std::array<float, 4>> boxes);
+        const std::vector<std::array<float, 4>>& boxes);
     void process_mask(const std::vector<float>& proto,
                       const std::vector<std::vector<float>>& masks,
                       const std::vector<std::array<float, 4>>& boxes,

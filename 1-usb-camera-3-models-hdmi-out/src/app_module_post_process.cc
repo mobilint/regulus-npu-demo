@@ -17,9 +17,8 @@ std::thread module_post_process_face(int npu_h, int npu_w, Queue& queue_in,
         int face_nc = 1;  // number of classes
         int face_imh = npu_h;
         int face_imw = npu_w;
-
-        mobilint::postface::YOLOv8FacePostProcessor post(
-            face_nc, face_imh, face_imw, face_conf_thres, face_iou_thres, 1, false);
+        mobilint::post::YOLOv8PostProcessor post(face_nc, face_imh, face_imw,
+                                                 face_conf_thres, face_iou_thres, false);
         Benchmarker bc;
         while (push_on) {
             InterThreadData data_in;
@@ -32,16 +31,15 @@ std::thread module_post_process_face(int npu_h, int npu_w, Queue& queue_in,
             std::vector<std::array<float, 4>> boxes;
             std::vector<float> scores;
             std::vector<int> labels;
-
-            std::vector<mobilint::NDArray<float>> result;
-
-            for (size_t i = 0; i < data_in.npu_result.size(); ++i) {
-                std::vector<int64_t> shape = {(signed long)data_in.npu_result[i].size()};
-                result.push_back(mobilint::NDArray(data_in.npu_result[i].data(), shape));
+            std::vector<std::vector<float>> keypoints;
+            // reorder
+            for (size_t i = 0; i + 1 < data_in.npu_result.size(); i += 2) {
+                std::swap(data_in.npu_result[i], data_in.npu_result[i + 1]);
             }
 
             bc.start();
-            uint64_t ticket = post.enqueue(data_in.frame, result, boxes, scores, labels);
+            uint64_t ticket = post.enqueue(data_in.frame, data_in.npu_result, boxes,
+                                           scores, labels, keypoints);
             post.receive(ticket);
             bc.end();
 

@@ -5,7 +5,7 @@
 
 namespace mobilint::post {
 
-void make_anchors(std::vector<std::vector<float>>& anchors_out,
+void make_anchors(std::vector<std::array<float, 2>>& anchors_out,
                   std::vector<float>& strides_out, int imh, int imw,
                   const std::vector<int>& strides, float grid_cell_offset = 0.5);
 float softmax_inplace_idx(const std::vector<float>& npu_out, int start_idx, int end_idx);
@@ -26,10 +26,10 @@ template <typename FloatContainer>
 void softmax_inplace(FloatContainer& con) {
     float sum = 0;
     for (auto v : con) {
-        sum += exp(v);
+        sum += std::exp(v);
     }
     for (auto& v : con) {
-        v = exp(v) / sum;
+        v = std::exp(v) / sum;
     }
 }
 

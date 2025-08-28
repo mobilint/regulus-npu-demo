@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-void mobilint::post::make_anchors(std::vector<std::vector<float>>& anchors_out,
+void mobilint::post::make_anchors(std::vector<std::array<float, 2>>& anchors_out,
                                   std::vector<float>& strides_out, int imh, int imw,
                                   const std::vector<int>& strides,
                                   float grid_cell_offset) {
@@ -29,7 +29,7 @@ void mobilint::post::make_anchors(std::vector<std::vector<float>>& anchors_out,
             float cy = static_cast<float>(y) + grid_cell_offset;
             for (int x = 0; x < w; ++x) {
                 float cx = static_cast<float>(x) + grid_cell_offset;
-                anchors_out.emplace_back(std::vector<float>{cx, cy});
+                anchors_out.push_back({cx, cy});
                 strides_out.emplace_back(stride_f);
             }
         }
@@ -38,17 +38,20 @@ void mobilint::post::make_anchors(std::vector<std::vector<float>>& anchors_out,
 
 float mobilint::post::softmax_inplace_idx(const std::vector<float>& npu_out,
                                           int start_idx, int end_idx) {
-    float sum = 0, result = 0;
-    for (int i = start_idx; i < end_idx; i++) {
-        sum += exp(npu_out[i]);
+    if (end_idx <= start_idx) return 0.f;
+    float m = npu_out[start_idx];
+    for (int i = start_idx + 1; i < end_idx; ++i) m = std::max(m, npu_out[i]);
+
+    double denom = 0.0, num = 0.0;
+    for (int i = start_idx; i < end_idx; ++i) {
+        const double t = std::exp(double(npu_out[i] - m));
+        denom += t;
+        num += t * double(i - start_idx);
     }
-    for (int i = start_idx; i < end_idx; i++) {
-        result += exp(npu_out[i]) / sum * (i - start_idx);
-    }
-    return result;
+    return float(num / denom);
 }
 
-float mobilint::post::sigmoid(const float& num) { return 1 / (1 + exp(-(float)num)); }
+float mobilint::post::sigmoid(const float& num) { return 1.f / (1.f + std::exp(-num)); }
 
 float mobilint::post::inverse_sigmoid(const float& num) { return -log(1 / num - 1); }
 
@@ -56,42 +59,34 @@ float mobilint::post::area(const float& xmin, const float& ymin, const float& xm
                            const float& ymax) {
     float width = xmax - xmin;
     float height = ymax - ymin;
-
-    if (width < 0) return 0;
-
-    if (height < 0) return 0;
-
-    return width * height;
+    return std::max(0.f, width) * std::max(0.f, height);
 }
 
 float mobilint::post::get_iou(const std::array<float, 4>& box1,
                               const std::array<float, 4>& box2) {
-    float epsilon = 1e-6;
+    const float iw =
+        std::max(0.f, std::min(box1[2], box2[2]) - std::max(box1[0], box2[0]));
+    const float ih =
+        std::max(0.f, std::min(box1[3], box2[3]) - std::max(box1[1], box2[1]));
+    const float inter = iw * ih;
 
-    // Coordinated of the overlapped region(intersection of two boxes)
-    float overlap_xmin = std::max(box1[0], box2[0]);
-    float overlap_ymin = std::max(box1[1], box2[1]);
-    float overlap_xmax = std::min(box1[2], box2[2]);
-    float overlap_ymax = std::min(box1[3], box2[3]);
+    const float aw = std::max(0.f, box1[2] - box1[0]);
+    const float ah = std::max(0.f, box1[3] - box1[1]);
+    const float bw = std::max(0.f, box2[2] - box2[0]);
+    const float bh = std::max(0.f, box2[3] - box2[1]);
 
-    // Calculate areas
-    float overlap_area = area(overlap_xmin, overlap_ymin, overlap_xmax, overlap_ymax);
-    float area1 = area(box1[0], box1[1], box1[2], box1[3]);
-    float area2 = area(box2[0], box2[1], box2[2], box2[3]);
-    float iou = overlap_area / (area1 + area2 - overlap_area + epsilon);
-
-    return iou;
+    const float ua = aw * ah + bw * bh - inter;
+    return inter / (ua + 1e-6f);
 }
 
 void mobilint::post::xywh2xyxy(std::vector<std::array<float, 4>>& pred_boxes) {
-    for (uint32_t i = 0; i < pred_boxes.size(); i++) {
-        float cx = pred_boxes[i][0];
-        float cy = pred_boxes[i][1];
-
-        pred_boxes[i][0] = cx - pred_boxes[i][2] * 0.5;
-        pred_boxes[i][1] = cy - pred_boxes[i][3] * 0.5;
-        pred_boxes[i][2] = cx + pred_boxes[i][2] * 0.5;
-        pred_boxes[i][3] = cy + pred_boxes[i][3] * 0.5;
+    for (auto& b : pred_boxes) {
+        const float cx = b[0], cy = b[1];
+        const float w = b[2], h = b[3];
+        b[0] = cx - 0.5f * w;
+        b[1] = cy - 0.5f * h;
+        b[2] = cx + 0.5f * w;
+        b[3] = cy + 0.5f * h;
     }
 }
 
@@ -109,15 +104,11 @@ void mobilint::post::compute_ratio_pads(const cv::Mat& im, const int& input_w,
 void mobilint::post::compute_ratio_pads(const int& org_w, const int& org_h,
                                         const int& input_w, const int& input_h,
                                         float& ratio, float& xpad, float& ypad) {
-    if (org_w > org_h) {
-        ratio = (float)input_w / org_w;
-        xpad = 0;
-        ypad = (input_h - ratio * org_h) / 2;
-    } else {
-        ratio = (float)input_h / org_h;
-        xpad = (input_w - ratio * org_w) / 2;
-        ypad = 0;
-    }
+    ratio = std::min(input_w / float(org_w), input_h / float(org_h));
+    const float new_w = ratio * org_w;
+    const float new_h = ratio * org_h;
+    xpad = (input_w - new_w) * 0.5f;
+    ypad = (input_h - new_h) * 0.5f;
 }
 
 cv::Mat mobilint::post::interpolate(const cv::Mat& input, const cv::Size& size,
@@ -130,18 +121,10 @@ cv::Mat mobilint::post::interpolate(const cv::Mat& input, const cv::Size& size,
 }
 
 cv::Mat mobilint::post::unpad_yolov8_seg(const cv::Mat& image, int xpad, int ypad) {
-    int rows = image.rows;
-    int cols = image.cols;
-
-    int width = cols - 2 * xpad;
-    int height = rows - 2 * ypad;
-
-    cv::Rect rect(xpad, ypad, width, height);
-
-    cv::Mat roi = image(rect);
-
-    cv::Mat cropped;
-    roi.copyTo(cropped);
-
-    return cropped;
+    const int cols = image.cols, rows = image.rows;
+    xpad = std::clamp(xpad, 0, cols / 2);
+    ypad = std::clamp(ypad, 0, rows / 2);
+    const int w = cols - 2 * xpad;
+    const int h = rows - 2 * ypad;
+    return image(cv::Rect(xpad, ypad, w, h)).clone();
 }

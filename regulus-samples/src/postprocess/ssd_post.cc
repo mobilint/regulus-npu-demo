@@ -31,6 +31,11 @@ void mobilint::post::SSDPostProcessor::setParams(int nc, int imh, int imw,
     mType = PostType::BASE;
     m_feat_sizes = {{19, 19}, {10, 10}, {5, 5}, {3, 3}, {2, 2}, {1, 1}};
     m_coder_weights = {0.1, 0.1, 0.2, 0.2};
+
+    int num_boxes = 1917;
+    std::vector<std::vector<float>> aspect_ratios = {
+        {2.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}};
+    prior_generation(m_feat_sizes, aspect_ratios, num_boxes);
 }
 
 /*
@@ -204,17 +209,16 @@ void mobilint::post::SSDPostProcessor::run_postprocess(
     std::vector<std::pair<float, int>> pred_scores;
     std::vector<int> pred_labels;
 
-    std::vector<std::vector<float>> aspect_ratios = {
-        {2.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}};
-    std::vector<std::pair<int, int>> feat_sizes;
-
-    int num_boxes = 0;
+    // int num_boxes = 0;
     int prior_offset = 0;
 
-    for (int i = 0; i < m_nl; i++) {
-        num_boxes += npu_outs[2 * i + 1].size() / 4;
-    }
-    prior_generation(m_feat_sizes, aspect_ratios, num_boxes);
+    // std::vector<std::vector<float>> aspect_ratios = {
+    //     {2.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}, {2.0f, 3.0f}};
+
+    // for (int i = 0; i < m_nl; i++) {
+    //     num_boxes += npu_outs[2 * i + 1].size() / 4;
+    // }
+    // prior_generation(m_feat_sizes, aspect_ratios, num_boxes);
 
     for (int i = 0; i < m_nl; i++) {
         decode_conf_thres(npu_outs[2 * i + 1], npu_outs[2 * i], i, prior_offset,

@@ -63,16 +63,14 @@ void mobilint::post::YOLOv8PosePostProcessor::run_postprocess(
     std::vector<int> pred_label;
     std::vector<std::pair<float, int>> pred_scores;
     std::vector<std::vector<float>> pred_extra;
-
-    std::vector<int> order = {6, 8, 5, 4, 7, 3, 1, 2, 0};
+    std::vector<std::array<int, 3>> indices = {{6, 8, 7}, {3, 5, 4}, {0, 2, 1}};
 
     for (int i = 0; i < m_nl; i++) {
-        decode_conf_thres(npu_outs[order[3 * i]], npu_outs[order[3 * i + 1]], m_grids[i],
-                          m_strides[i], pred_boxes, pred_conf, pred_label, pred_scores,
-                          npu_outs[order[3 * i + 2]], pred_extra);
+        auto [cls_idx, box_idx, extra_idx] = indices[i];
+        decode_conf_thres(npu_outs[box_idx], npu_outs[cls_idx], m_grids[i], m_strides[i],
+                          pred_boxes, pred_conf, pred_label, pred_scores,
+                          npu_outs[extra_idx], pred_extra);
     }
-
-    xywh2xyxy(pred_boxes);
 
     nms(pred_boxes, pred_conf, pred_label, pred_scores, pred_extra, final_boxes,
         final_scores, final_labels, final_extra);
