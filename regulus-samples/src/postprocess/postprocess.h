@@ -37,8 +37,9 @@ public:
     ~PostProcessor();
 
 public:
-    virtual void setParams(int nc, int imh, int imw, float conf_thres = 0.3,
-                           float iou_thres = 0.6, int max_num_threads = 4);
+    virtual void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
+                            float iou_thres = 0.6, int max_num_threads = 4);
+    void set_nl(int nl) { m_nl = nl; };
     virtual void run_postprocess(const std::vector<std::vector<float>>& npu_outs){};
 
     int get_nl() const;

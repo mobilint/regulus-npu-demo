@@ -29,8 +29,8 @@ public:
     ~SSDPostProcessor();
 
 public:
-    void setParams(int nc, int imh, int imw, float conf_thres = 0.3,
-                   float iou_thres = 0.6, int max_num_threads = 4) override;
+    void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
+                    float iou_thres = 0.6, int max_num_threads = 4) override;
     void run_postprocess(const std::vector<std::vector<float>>& npu_outs);
 
     void prior_generation(const std::vector<std::pair<int, int>>& feat_sizes,

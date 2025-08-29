@@ -9,6 +9,8 @@
 
 #include "src/model/model.h"
 #include "src/postprocess/ssd_post.h"
+#include "src/postprocess/yolo_anchor_post.h"
+#include "src/postprocess/yolo_anchorless_face_post.h"
 #include "src/postprocess/yolo_anchorless_pose_post.h"
 #include "src/postprocess/yolo_anchorless_post.h"
 #include "src/postprocess/yolo_anchorless_seg_post.h"
@@ -24,6 +26,35 @@ bool contains(const std::string& str, const std::string& target) {
 std::string get_filename(const std::string& path) {
     size_t pos = path.find_last_of("/\\");
     return (pos == std::string::npos) ? path : path.substr(pos + 1);
+}
+
+void inference_det_anchor(std::string mxq_path, std::string img_path,
+                          std::string save_path) {
+    NPUModel model(mxq_path);
+
+    int imh = 640;
+    int imw = 640;
+    int num_class = 80;
+    float conf_thres = 0.3;
+    float iou_thres = 0.6;
+
+    YOLOAnchorPostProcessor postProcessor(num_class, imh, imw, conf_thres, iou_thres);
+    PreProcessor preProcessor(imh, imw, false);
+    cv::Mat org_img = cv::imread(img_path);
+
+    auto preprocessed = preProcessor(org_img);
+    auto output = model(std::move(preprocessed));
+
+    std::vector<std::array<float, 4>> boxes;
+    std::vector<float> scores;
+    std::vector<int> labels;
+    std::vector<std::vector<float>> extras;
+
+    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
+    postProcessor.receive(ticket);
+
+    postProcessor.plot_boxes(org_img, boxes, scores, labels);
+    cv::imwrite(save_path, org_img);
 }
 
 void inference_det(std::string mxq_path, std::string img_path, std::string save_path) {
@@ -144,6 +175,37 @@ void inference_pose(std::string mxq_path, std::string img_path, std::string save
     cv::imwrite(save_path, org_img);
 }
 
+void inference_face(std::string mxq_path, std::string img_path, std::string save_path) {
+    NPUModel model(mxq_path);
+
+    int imh = 640;
+    int imw = 640;
+    int num_class = 1;
+    float conf_thres = 0.3;
+    float iou_thres = 0.6;
+
+    YOLOAnchorlessFacePostProcessor postProcessor(num_class, imh, imw, conf_thres,
+                                                  iou_thres);
+    PreProcessor preProcessor(imh, imw, false);
+    cv::Mat org_img = cv::imread(img_path);
+
+    auto preprocessed = preProcessor(org_img);
+    auto output = model(std::move(preprocessed));
+
+    std::vector<std::array<float, 4>> boxes;
+    std::vector<float> scores;
+    std::vector<int> labels;
+    std::vector<std::vector<float>> extras;
+
+    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
+    postProcessor.receive(ticket);
+
+    postProcessor.plot_boxes(org_img, boxes, scores, labels);
+    postProcessor.plot_keypoints(org_img, extras);
+
+    cv::imwrite(save_path, org_img);
+}
+
 int main(int argc, char** argv) {
     if (argc != 3) {
         fprintf(stderr,
@@ -161,6 +223,10 @@ int main(int argc, char** argv) {
         inference_seg(mxq_path, img_path, save_path);
     } else if (contains(model_name, "pose")) {
         inference_pose(mxq_path, img_path, save_path);
+    } else if (contains(model_name, "face")) {
+        inference_face(mxq_path, img_path, save_path);
+    } else if (contains(model_name, "yolov5") || contains(model_name, "yolov7")) {
+        inference_det_anchor(mxq_path, img_path, save_path);
     } else if (contains(model_name, "yolo")) {
         inference_det(mxq_path, img_path, save_path);
     } else if (contains(model_name, "ssd")) {

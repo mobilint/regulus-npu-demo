@@ -3,12 +3,12 @@
 #include "commons.h"
 
 mobilint::post::PostProcessor::PostProcessor(int nc, int imh, int imw) {
-    setParams(nc, imh, imw);
+    set_params(nc, imh, imw);
 }
 
 mobilint::post::PostProcessor::PostProcessor(int nc, int imh, int imw, float conf_thres,
                                              float iou_thres, int max_num_threads) {
-    setParams(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
 }
 
 mobilint::post::PostProcessor::~PostProcessor() {
@@ -20,8 +20,8 @@ mobilint::post::PostProcessor::~PostProcessor() {
     }
 }
 
-void mobilint::post::PostProcessor::setParams(int nc, int imh, int imw, float conf_thres,
-                                              float iou_thres, int max_num_threads) {
+void mobilint::post::PostProcessor::set_params(int nc, int imh, int imw, float conf_thres,
+                                               float iou_thres, int max_num_threads) {
     m_max_num_threads = max_num_threads;
     m_nc = nc;                  // number of classes
     m_nl = 3;                   // number of detection layers

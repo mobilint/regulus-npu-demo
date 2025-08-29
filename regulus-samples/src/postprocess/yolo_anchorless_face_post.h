@@ -20,13 +20,13 @@
 
 namespace mobilint::post {
 
-class YOLOAnchorlessPosePostProcessor : public PostProcessor {
+class YOLOAnchorlessFacePostProcessor : public PostProcessor {
 public:
-    YOLOAnchorlessPosePostProcessor();
-    YOLOAnchorlessPosePostProcessor(int nc, int imh, int imw);
-    YOLOAnchorlessPosePostProcessor(int nc, int imh, int imw, float conf_thres,
+    YOLOAnchorlessFacePostProcessor();
+    YOLOAnchorlessFacePostProcessor(int nc, int imh, int imw);
+    YOLOAnchorlessFacePostProcessor(int nc, int imh, int imw, float conf_thres,
                                     float iou_thres, int max_num_threads = 4);
-    ~YOLOAnchorlessPosePostProcessor();
+    ~YOLOAnchorlessFacePostProcessor();
 
 public:
     void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
@@ -60,21 +60,7 @@ protected:
 
     int m_reg_max = 16;
 
-    const std::vector<std::array<int, 2>> m_skeleton = {
-        {16, 14}, {14, 12}, {17, 15}, {15, 13}, {12, 13}, {6, 12}, {7, 13},
-        {6, 7},   {6, 8},   {7, 9},   {8, 10},  {9, 11},  {2, 3},  {1, 2},
-        {1, 3},   {2, 4},   {3, 5},   {4, 6},   {5, 7}};
-
-    const std::vector<std::array<int, 3>> m_pose_limb_color = {
-        {51, 153, 255}, {51, 153, 255}, {51, 153, 255}, {51, 153, 255}, {255, 51, 255},
-        {255, 51, 255}, {255, 51, 255}, {255, 128, 0},  {255, 128, 0},  {255, 128, 0},
-        {255, 128, 0},  {255, 128, 0},  {0, 255, 0},    {0, 255, 0},    {0, 255, 0},
-        {0, 255, 0},    {0, 255, 0},    {0, 255, 0},    {0, 255, 0}};
-
-    const std::vector<std::array<int, 3>> m_pose_kpt_color = {
-        {0, 255, 0},    {0, 255, 0},    {0, 255, 0},    {0, 255, 0},    {0, 255, 0},
-        {255, 128, 0},  {255, 128, 0},  {255, 128, 0},  {255, 128, 0},  {255, 128, 0},
-        {255, 128, 0},  {51, 153, 255}, {51, 153, 255}, {51, 153, 255}, {51, 153, 255},
-        {51, 153, 255}, {51, 153, 255}};
+    const std::vector<std::array<int, 3>> m_face_landmark_colors = {
+        {255, 60, 65}, {255, 60, 65}, {250, 155, 150}, {210, 210, 50}, {210, 210, 50}};
 };
 };  // namespace mobilint::post

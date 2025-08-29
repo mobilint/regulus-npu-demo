@@ -7,12 +7,12 @@ using namespace mobilint::post;
 mobilint::post::YOLOAnchorlessSegPostProcessor::YOLOAnchorlessSegPostProcessor(int nc,
                                                                                int imh,
                                                                                int imw) {
-    setParams(nc, imh, imw);
+    set_params(nc, imh, imw);
 }
 
 mobilint::post::YOLOAnchorlessSegPostProcessor::YOLOAnchorlessSegPostProcessor(
     int nc, int imh, int imw, float conf_thres, float iou_thres, int max_num_threads) {
-    setParams(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
 }
 
 mobilint::post::YOLOAnchorlessSegPostProcessor::~YOLOAnchorlessSegPostProcessor() {
@@ -24,11 +24,11 @@ mobilint::post::YOLOAnchorlessSegPostProcessor::~YOLOAnchorlessSegPostProcessor(
     }
 }
 
-void mobilint::post::YOLOAnchorlessSegPostProcessor::setParams(int nc, int imh, int imw,
-                                                               float conf_thres,
-                                                               float iou_thres,
-                                                               int max_num_threads) {
-    PostProcessor::setParams(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+void mobilint::post::YOLOAnchorlessSegPostProcessor::set_params(int nc, int imh, int imw,
+                                                                float conf_thres,
+                                                                float iou_thres,
+                                                                int max_num_threads) {
+    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
     mType = PostType::SEG;
     m_proto_stride = 4;
     m_proto_h = m_imh / m_proto_stride;

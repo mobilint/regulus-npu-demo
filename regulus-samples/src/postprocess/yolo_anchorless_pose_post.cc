@@ -6,12 +6,12 @@ using namespace mobilint::post;
 
 mobilint::post::YOLOAnchorlessPosePostProcessor::YOLOAnchorlessPosePostProcessor(
     int nc, int imh, int imw) {
-    setParams(nc, imh, imw);
+    set_params(nc, imh, imw);
 }
 
 mobilint::post::YOLOAnchorlessPosePostProcessor::YOLOAnchorlessPosePostProcessor(
     int nc, int imh, int imw, float conf_thres, float iou_thres, int max_num_threads) {
-    setParams(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
 }
 
 mobilint::post::YOLOAnchorlessPosePostProcessor::~YOLOAnchorlessPosePostProcessor() {
@@ -23,11 +23,11 @@ mobilint::post::YOLOAnchorlessPosePostProcessor::~YOLOAnchorlessPosePostProcesso
     }
 }
 
-void mobilint::post::YOLOAnchorlessPosePostProcessor::setParams(int nc, int imh, int imw,
-                                                                float conf_thres,
-                                                                float iou_thres,
-                                                                int max_num_threads) {
-    PostProcessor::setParams(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+void mobilint::post::YOLOAnchorlessPosePostProcessor::set_params(int nc, int imh, int imw,
+                                                                 float conf_thres,
+                                                                 float iou_thres,
+                                                                 int max_num_threads) {
+    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
     mType = PostType::POSE;
     m_nextra = 51;
 
