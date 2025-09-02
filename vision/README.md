@@ -64,3 +64,9 @@ The inference result image will be saved in the same directory as the source ima
 | yolov8s-pose | (640, 640, 3) |
 | yolov8m-pose | (640, 640, 3) |
 | yolov8l-pose | (640, 640, 3) |
+
+### Face Detection
+
+| Model | Input Size <br> (H, W, C) |
+|------------|------------|
+| [yolov8n-face](https://github.com/derronqi/yolov8-face) | (640, 640, 3) |
