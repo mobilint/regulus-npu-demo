@@ -1,0 +1,13 @@
+Pre-order: [Resize, Normalize]
+Pre-processing:
+  Resize:
+    size: [300, 300]
+  Normalize:
+    style: tf
+Post-processing:
+  type: ssd
+  task: object_detection
+  nc: 91
+  nl: 6
+  conf_thres: 0.3
+  iou_thres: 0.6

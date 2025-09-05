@@ -1,0 +1,11 @@
+Pre-order: [YoloPre]
+Pre-processing:
+  YoloPre:
+    size: [640, 640]
+Post-processing:
+  type: yolo
+  task: object_detection
+  nc: 80
+  nl: 3
+  conf_thres: 0.25
+  iou_thres: 0.7
