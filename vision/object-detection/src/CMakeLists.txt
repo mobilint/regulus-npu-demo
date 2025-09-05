@@ -4,6 +4,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 file(GLOB_RECURSE VISION_SRC
     model/*.cc
+    config/*.cc
+    config/types.h
     preprocess/*.cc
     postprocess/*.cc
 )
@@ -12,6 +14,7 @@ add_library(visionlib STATIC ${VISION_SRC})
 
 target_include_directories(visionlib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/model
+    ${CMAKE_CURRENT_SOURCE_DIR}/config
     ${CMAKE_CURRENT_SOURCE_DIR}/preprocess
     ${CMAKE_CURRENT_SOURCE_DIR}/postprocess
 )

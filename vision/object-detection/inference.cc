@@ -43,11 +43,23 @@ void inference_det_anchor(std::string mxq_path, std::string img_path,
     float conf_thres = 0.3;
     float iou_thres = 0.6;
 
-    YOLOAnchorPostProcessor postProcessor(num_class, imh, imw, conf_thres, iou_thres);
-    PreProcessor preProcessor(imh, imw, false);
-    cv::Mat org_img = cv::imread(img_path);
+    // YOLOv5 P5 anchors
+    std::vector<std::vector<std::vector<double>>> anchors = {
+        {{10, 13}, {16, 30}, {33, 23}},      // P3/8
+        {{30, 61}, {62, 45}, {59, 119}},     // P4/16
+        {{116, 90}, {156, 198}, {373, 326}}  // P5/32
+    };
 
-    auto preprocessed = preProcessor(org_img);
+    int nl = anchors.size();
+
+    YOLOAnchorPostProcessor post_processor(num_class, imh, imw, conf_thres, iou_thres,
+                                           nl);
+    post_processor.set_anchors(anchors);
+
+    PreProcessor pre_processor;
+    cv::Mat org_img = cv::imread(img_path);
+    auto preprocessed = pre_processor(org_img, imh, imw, "yolo");
+
     auto output = model(std::move(preprocessed));
 
     std::vector<std::array<float, 4>> boxes;
@@ -55,10 +67,10 @@ void inference_det_anchor(std::string mxq_path, std::string img_path,
     std::vector<int> labels;
     std::vector<std::vector<float>> extras;
 
-    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
-    postProcessor.receive(ticket);
+    uint64_t ticket = post_processor.enqueue(output, boxes, scores, labels, extras);
+    post_processor.receive(ticket);
 
-    postProcessor.plot_boxes(org_img, boxes, scores, labels);
+    post_processor.plot_results(org_img, boxes, scores, labels);
     cv::imwrite(save_path, org_img);
 }
 
@@ -72,11 +84,12 @@ void inference_det_anchorless(std::string mxq_path, std::string img_path,
     float conf_thres = 0.3;
     float iou_thres = 0.6;
 
-    YOLOAnchorlessPostProcessor postProcessor(num_class, imh, imw, conf_thres, iou_thres);
-    PreProcessor preProcessor(imh, imw, false);
+    YOLOAnchorlessPostProcessor post_processor(num_class, imh, imw, conf_thres,
+                                               iou_thres);
+    PreProcessor pre_processor;
     cv::Mat org_img = cv::imread(img_path);
 
-    auto preprocessed = preProcessor(org_img);
+    auto preprocessed = pre_processor(org_img, imh, imw, "yolo");
     auto output = model(std::move(preprocessed));
 
     std::vector<std::array<float, 4>> boxes;
@@ -84,10 +97,10 @@ void inference_det_anchorless(std::string mxq_path, std::string img_path,
     std::vector<int> labels;
     std::vector<std::vector<float>> extras;
 
-    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
-    postProcessor.receive(ticket);
+    uint64_t ticket = post_processor.enqueue(output, boxes, scores, labels, extras);
+    post_processor.receive(ticket);
 
-    postProcessor.plot_boxes(org_img, boxes, scores, labels);
+    post_processor.plot_results(org_img, boxes, scores, labels);
     cv::imwrite(save_path, org_img);
 }
 
@@ -100,11 +113,11 @@ void inference_ssd(std::string mxq_path, std::string img_path, std::string save_
     float conf_thres = 0.3;
     float iou_thres = 0.6;
 
-    SSDPostProcessor postProcessor(num_class, imh, imw, conf_thres, iou_thres);
-    PreProcessor preProcessor(imh, imw, /*is_ssd*/ true);
+    SSDPostProcessor post_processor(num_class, imh, imw, conf_thres, iou_thres);
+    PreProcessor pre_processor;
     cv::Mat org_img = cv::imread(img_path);
 
-    auto preprocessed = preProcessor(org_img);
+    auto preprocessed = pre_processor(org_img, imh, imw, "ssd");
     auto output = model(std::move(preprocessed));
 
     std::vector<std::array<float, 4>> boxes;
@@ -112,10 +125,10 @@ void inference_ssd(std::string mxq_path, std::string img_path, std::string save_
     std::vector<int> labels;
     std::vector<std::vector<float>> extras;
 
-    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
-    postProcessor.receive(ticket);
+    uint64_t ticket = post_processor.enqueue(output, boxes, scores, labels, extras);
+    post_processor.receive(ticket);
 
-    postProcessor.plot_boxes(org_img, boxes, scores, labels);
+    post_processor.plot_results(org_img, boxes, scores, labels);
     cv::imwrite(save_path, org_img);
 }
 

@@ -4,30 +4,31 @@
 
 using namespace mobilint::post;
 
+mobilint::post::SSDPostProcessor::SSDPostProcessor(int imh, int imw,
+                                                   const ModelInfo& cfg) {
+    const auto& post_info = cfg.m_postprocess;
+    int nc = post_info.num_classes;
+    int nl = post_info.num_layers;
+    float conf_thres = post_info.conf_thres;
+    float iou_thres = post_info.iou_thres;
+
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl);
+}
+
 mobilint::post::SSDPostProcessor::SSDPostProcessor(int nc, int imh, int imw) {
     set_params(nc, imh, imw);
 }
 
 mobilint::post::SSDPostProcessor::SSDPostProcessor(int nc, int imh, int imw,
                                                    float conf_thres, float iou_thres,
-                                                   int max_num_threads) {
-    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
-}
-
-mobilint::post::SSDPostProcessor::~SSDPostProcessor() {
-    destroyed = true;
-    mCondIn.notify_all();
-    mCondOut.notify_all();
-    if (mThread.joinable()) {
-        mThread.join();
-    }
+                                                   int nl, int max_num_threads) {
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
 }
 
 void mobilint::post::SSDPostProcessor::set_params(int nc, int imh, int imw,
                                                   float conf_thres, float iou_thres,
-                                                  int max_num_threads) {
-    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
-    m_nl = 6;
+                                                  int nl, int max_num_threads) {
+    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
     mType = PostType::BASE;
     m_feat_sizes = {{19, 19}, {10, 10}, {5, 5}, {3, 3}, {2, 2}, {1, 1}};
     m_coder_weights = {0.1, 0.1, 0.2, 0.2};

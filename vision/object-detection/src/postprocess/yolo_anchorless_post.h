@@ -23,14 +23,14 @@ namespace mobilint::post {
 class YOLOAnchorlessPostProcessor : public PostProcessor {
 public:
     YOLOAnchorlessPostProcessor();
+    YOLOAnchorlessPostProcessor(int imh, int imw, const ModelInfo& cfg);
     YOLOAnchorlessPostProcessor(int nc, int imh, int imw);
     YOLOAnchorlessPostProcessor(int nc, int imh, int imw, float conf_thres,
-                                float iou_thres, int max_num_threads = 4);
-    ~YOLOAnchorlessPostProcessor();
+                                float iou_thres, int nl = 3, int max_num_threads = 4);
 
 public:
     void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
-                    float iou_thres = 0.6, int max_num_threads = 4) override;
+                    float iou_thres = 0.6, int nl = 3, int max_num_threads = 4) override;
     std::vector<std::vector<int>> generate_grids(int imh, int imw,
                                                  std::vector<int> strides);
     std::vector<int> generate_strides(int nl);

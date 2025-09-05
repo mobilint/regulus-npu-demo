@@ -23,14 +23,14 @@ namespace mobilint::post {
 class SSDPostProcessor : public PostProcessor {
 public:
     SSDPostProcessor();
+    SSDPostProcessor(int imh, int imw, const ModelInfo& cfg);
     SSDPostProcessor(int nc, int imh, int imw);
     SSDPostProcessor(int nc, int imh, int imw, float conf_thres, float iou_thres,
-                     int max_num_threads = 4);
-    ~SSDPostProcessor();
+                     int nl = 6, int max_num_threads = 4);
 
 public:
     void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
-                    float iou_thres = 0.6, int max_num_threads = 4) override;
+                    float iou_thres = 0.6, int nl = 6, int max_num_threads = 4) override;
     void run_postprocess(const std::vector<std::vector<float>>& npu_outs);
 
     void prior_generation(const std::vector<std::pair<int, int>>& feat_sizes,

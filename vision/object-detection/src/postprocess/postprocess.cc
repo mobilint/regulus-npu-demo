@@ -2,29 +2,50 @@
 
 #include "commons.h"
 
+mobilint::post::PostProcessor::PostProcessor(int imh, int imw, const ModelInfo& cfg) {
+    const auto& post_info = cfg.m_postprocess;
+    int nc = post_info.num_classes;
+    int nl = post_info.num_layers;
+    float conf_thres = post_info.conf_thres;
+    float iou_thres = post_info.iou_thres;
+
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl);
+}
+
 mobilint::post::PostProcessor::PostProcessor(int nc, int imh, int imw) {
     set_params(nc, imh, imw);
 }
 
 mobilint::post::PostProcessor::PostProcessor(int nc, int imh, int imw, float conf_thres,
-                                             float iou_thres, int max_num_threads) {
-    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+                                             float iou_thres, int nl,
+                                             int max_num_threads) {
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
 }
 
-mobilint::post::PostProcessor::~PostProcessor() {
-    destroyed = true;
+mobilint::post::PostProcessor::~PostProcessor() noexcept {
+    {
+        std::lock_guard<std::mutex> lk(mMutexIn);
+        destroyed = true;
+    }
+
     mCondIn.notify_all();
     mCondOut.notify_all();
+
     if (mThread.joinable()) {
-        mThread.join();
+        if (std::this_thread::get_id() == mThread.get_id()) {
+            mThread.detach();
+        } else {
+            mThread.join();
+        }
     }
 }
 
 void mobilint::post::PostProcessor::set_params(int nc, int imh, int imw, float conf_thres,
-                                               float iou_thres, int max_num_threads) {
+                                               float iou_thres, int nl,
+                                               int max_num_threads) {
     m_max_num_threads = max_num_threads;
     m_nc = nc;                  // number of classes
-    m_nl = 3;                   // number of detection layers
+    m_nl = nl;                  // number of detection layers
     m_nextra = 0;               // number of extra outputs
     m_imh = imh;                // model input image height
     m_imw = imw;                // model input image width
@@ -153,6 +174,13 @@ std::vector<std::vector<float>>& mobilint::post::PostProcessor::get_result_extra
     return final_extra;
 }
 
+void mobilint::post::PostProcessor::plot_results(
+    cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
+    const std::vector<float>& scores, const std::vector<int>& labels,
+    const std::vector<std::vector<float>>& extras) {
+    plot_boxes(im, boxes, scores, labels);
+    plot_extras(im, extras);
+}
 /*
                 Draw detected box and write the it's label & score
 */
@@ -258,9 +286,9 @@ uint64_t mobilint::post::PostProcessor::enqueue(std::vector<std::vector<float>>&
         mQueueIn.push({++ticket, npu_outs, boxes, scores, labels, extras});
         ticket_save = ticket;
 
-        mCondIn.notify_all();  // JUST IN CASE
         print(title + "Input Queue size " + std::to_string(mQueueIn.size()));
     }
+    mCondIn.notify_all();  // JUST IN CASE
 
     print(title + "Finish");
     return ticket_save;
