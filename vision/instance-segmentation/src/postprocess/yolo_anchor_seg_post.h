@@ -23,18 +23,19 @@ namespace mobilint::post {
 class YOLOAnchorSegPostProcessor : public PostProcessor {
 public:
     YOLOAnchorSegPostProcessor();
+    YOLOAnchorSegPostProcessor(int imh, int imw, const ModelInfo& cfg);
     YOLOAnchorSegPostProcessor(int nc, int imh, int imw);
     YOLOAnchorSegPostProcessor(int nc, int imh, int imw, float conf_thres,
-                               float iou_thres, int max_num_threads = 4);
-    ~YOLOAnchorSegPostProcessor();
+                               float iou_thres, int nl = 3, int max_num_threads = 4);
 
 public:
     void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
-                    float iou_thres = 0.6, int max_num_threads = 4) override;
+                    float iou_thres = 0.6, int nl = 3, int max_num_threads = 4) override;
     std::vector<std::vector<int>> generate_grids(int imh, int imw,
                                                  std::vector<int> strides);
     std::vector<int> generate_strides(int nl);
     void set_default_anchors();
+    void set_anchors(const std::vector<std::vector<std::vector<double>>>& anchors);
     std::vector<std::array<float, 4>> downsample_boxes(
         const std::vector<std::array<float, 4>>& boxes);
     void process_mask(const std::vector<float>& proto,
@@ -45,12 +46,14 @@ public:
 
     void decode_conf_thres(const std::vector<float>& npu_out,
                            const std::vector<int>& grid, int stride,
-                           const std::vector<std::vector<int>>& anchor,
+                           const std::vector<std::vector<double>>& anchor,
                            std::vector<std::array<float, 4>>& pred_boxes,
                            std::vector<std::pair<float, int>>& pred_scores,
                            std::vector<int>& pred_label,
                            std::vector<std::vector<float>>& pred_extra);
-
+    void plot_results(cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
+                      const std::vector<float>& scores, const std::vector<int>& labels,
+                      const std::vector<std::vector<float>>& extras = {}) override;
     void plot_masks(cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
                     const std::vector<int>& labels);
     void worker() override;
@@ -60,7 +63,7 @@ protected:
     int m_na;  // number of anchors
     std::vector<int> m_strides;
     std::vector<std::vector<int>> m_grids;
-    std::vector<std::vector<std::vector<int>>> m_anchors;
+    std::vector<std::vector<std::vector<double>>> m_anchors;
 
     int m_proto_stride;
     int m_proto_h;

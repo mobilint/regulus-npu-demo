@@ -260,7 +260,7 @@ void mobilint::post::SSDPostProcessor::plot_boxes(
 
         double font_scale = std::min(std::max(rect.width / 500.0, 0.35), 0.99);
         std::string desc =
-            COCO_LABELS[labels[i]] + " " + std::to_string((int)(scores[i] * 100)) + "%";
+            DET_LABELS[labels[i]] + " " + std::to_string((int)(scores[i] * 100)) + "%";
         cv::putText(im, desc, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX,
                     font_scale, clr, 1, false);
     }

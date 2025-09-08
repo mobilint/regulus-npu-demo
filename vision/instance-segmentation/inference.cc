@@ -42,11 +42,21 @@ void inference_seg_anchor(std::string mxq_path, std::string img_path,
     float conf_thres = 0.3;
     float iou_thres = 0.6;
 
-    YOLOAnchorSegPostProcessor postProcessor(num_class, imh, imw, conf_thres, iou_thres);
-    PreProcessor preProcessor(imh, imw, false);
+    // YOLOv5 P5 anchors
+    std::vector<std::vector<std::vector<double>>> anchors = {
+        {{10, 13}, {16, 30}, {33, 23}},      // P3/8
+        {{30, 61}, {62, 45}, {59, 119}},     // P4/16
+        {{116, 90}, {156, 198}, {373, 326}}  // P5/32
+    };
+
+    int nl = anchors.size();
+
+    YOLOAnchorSegPostProcessor post_processor(num_class, imh, imw, conf_thres, iou_thres,
+                                              nl);
+    PreProcessor pre_processor;
     cv::Mat org_img = cv::imread(img_path);
 
-    auto preprocessed = preProcessor(org_img);
+    auto preprocessed = pre_processor(org_img, imh, imw, "yolo");
     auto output = model(std::move(preprocessed));
 
     std::vector<std::array<float, 4>> boxes;
@@ -54,11 +64,10 @@ void inference_seg_anchor(std::string mxq_path, std::string img_path,
     std::vector<int> labels;
     std::vector<std::vector<float>> extras;
 
-    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
-    postProcessor.receive(ticket);
+    uint64_t ticket = post_processor.enqueue(output, boxes, scores, labels, extras);
+    post_processor.receive(ticket);
 
-    postProcessor.plot_boxes(org_img, boxes, scores, labels);
-    postProcessor.plot_masks(org_img, boxes, labels);
+    post_processor.plot_results(org_img, boxes, scores, labels);
 
     cv::imwrite(save_path, org_img);
 }
@@ -73,12 +82,12 @@ void inference_seg_anchorless(std::string mxq_path, std::string img_path,
     float conf_thres = 0.3;
     float iou_thres = 0.6;
 
-    YOLOAnchorlessSegPostProcessor postProcessor(num_class, imh, imw, conf_thres,
-                                                 iou_thres);
-    PreProcessor preProcessor(imh, imw, false);
+    YOLOAnchorlessSegPostProcessor post_processor(num_class, imh, imw, conf_thres,
+                                                  iou_thres);
+    PreProcessor pre_processor;
     cv::Mat org_img = cv::imread(img_path);
 
-    auto preprocessed = preProcessor(org_img);
+    auto preprocessed = pre_processor(org_img, imh, imw, "yolo");
     auto output = model(std::move(preprocessed));
 
     std::vector<std::array<float, 4>> boxes;
@@ -86,11 +95,10 @@ void inference_seg_anchorless(std::string mxq_path, std::string img_path,
     std::vector<int> labels;
     std::vector<std::vector<float>> extras;
 
-    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
-    postProcessor.receive(ticket);
+    uint64_t ticket = post_processor.enqueue(output, boxes, scores, labels, extras);
+    post_processor.receive(ticket);
 
-    postProcessor.plot_boxes(org_img, boxes, scores, labels);
-    postProcessor.plot_masks(org_img, boxes, labels);
+    post_processor.plot_results(org_img, boxes, scores, labels);
 
     cv::imwrite(save_path, org_img);
 }

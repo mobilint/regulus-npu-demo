@@ -54,7 +54,7 @@ protected:
     std::vector<std::pair<int, int>> m_feat_sizes;
     int m_reg_max = 16;
 
-    const std::vector<std::string> COCO_LABELS = {
+    const std::vector<std::string> DET_LABELS = {
         "background",    "person",      "bicycle",      "car",          "motorbike",
         "aeroplane",     "bus",         "train",        "truck",        "boat",
         "trafficlight",  "firehydrant", "streetsign",   "stopsign",     "parkingmeter",

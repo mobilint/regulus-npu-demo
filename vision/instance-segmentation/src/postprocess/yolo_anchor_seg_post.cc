@@ -8,30 +8,36 @@ using namespace std::chrono;
 
 using namespace mobilint::post;
 
+mobilint::post::YOLOAnchorSegPostProcessor::YOLOAnchorSegPostProcessor(
+    int imh, int imw, const ModelInfo& cfg) {
+    const auto& post_info = cfg.m_postprocess;
+    int nc = post_info.num_classes;
+    int nl = post_info.num_layers;
+    float conf_thres = post_info.conf_thres;
+    float iou_thres = post_info.iou_thres;
+
+    set_anchors(post_info.anchors);
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl);
+}
+
 mobilint::post::YOLOAnchorSegPostProcessor::YOLOAnchorSegPostProcessor(int nc, int imh,
                                                                        int imw) {
     set_params(nc, imh, imw);
+    set_default_anchors();
 }
 
 mobilint::post::YOLOAnchorSegPostProcessor::YOLOAnchorSegPostProcessor(
-    int nc, int imh, int imw, float conf_thres, float iou_thres, int max_num_threads) {
-    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
-}
-
-mobilint::post::YOLOAnchorSegPostProcessor::~YOLOAnchorSegPostProcessor() {
-    destroyed = true;
-    mCondIn.notify_all();
-    mCondOut.notify_all();
-    if (mThread.joinable()) {
-        mThread.join();
-    }
+    int nc, int imh, int imw, float conf_thres, float iou_thres, int nl,
+    int max_num_threads) {
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
+    set_default_anchors();
 }
 
 void mobilint::post::YOLOAnchorSegPostProcessor::set_params(int nc, int imh, int imw,
                                                             float conf_thres,
-                                                            float iou_thres,
+                                                            float iou_thres, int nl,
                                                             int max_num_threads) {
-    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
     mType = PostType::SEG;
     m_proto_stride = 4;
     m_proto_h = m_imh / m_proto_stride;
@@ -41,8 +47,6 @@ void mobilint::post::YOLOAnchorSegPostProcessor::set_params(int nc, int imh, int
 
     m_strides = generate_strides(m_nl);
     m_grids = generate_grids(m_imh, m_imw, m_strides);
-    set_default_anchors();
-    m_na = m_anchors[0].size();
 }
 
 std::vector<std::vector<int>> mobilint::post::YOLOAnchorSegPostProcessor::generate_grids(
@@ -102,6 +106,13 @@ void mobilint::post::YOLOAnchorSegPostProcessor::set_default_anchors() {
     } else {
         throw std::invalid_argument("Number of detection layers should 3 or 4");
     }
+    m_na = m_anchors[0].size();
+}
+
+void mobilint::post::YOLOAnchorSegPostProcessor::set_anchors(
+    const std::vector<std::vector<std::vector<double>>>& anchors) {
+    m_anchors = anchors;
+    m_na = m_anchors[0].size();
 }
 
 std::vector<std::array<float, 4>>
@@ -167,7 +178,7 @@ void mobilint::post::YOLOAnchorSegPostProcessor::process_mask(
 */
 void mobilint::post::YOLOAnchorSegPostProcessor::decode_conf_thres(
     const std::vector<float>& npu_out, const std::vector<int>& grid, int stride,
-    const std::vector<std::vector<int>>& anchor,
+    const std::vector<std::vector<double>>& anchor,
     std::vector<std::array<float, 4>>& pred_boxes,
     std::vector<std::pair<float, int>>& pred_scores, std::vector<int>& pred_label,
     std::vector<std::vector<float>>& pred_extra) {
@@ -213,6 +224,14 @@ void mobilint::post::YOLOAnchorSegPostProcessor::decode_conf_thres(
             }
         }
     }
+}
+
+void mobilint::post::YOLOAnchorSegPostProcessor::plot_results(
+    cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
+    const std::vector<float>& scores, const std::vector<int>& labels,
+    const std::vector<std::vector<float>>& extras) {
+    plot_boxes(im, boxes, scores, labels);
+    plot_masks(im, boxes, labels);
 }
 
 /*

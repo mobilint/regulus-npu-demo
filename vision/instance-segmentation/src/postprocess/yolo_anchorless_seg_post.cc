@@ -4,6 +4,17 @@
 
 using namespace mobilint::post;
 
+mobilint::post::YOLOAnchorlessSegPostProcessor::YOLOAnchorlessSegPostProcessor(
+    int imh, int imw, const ModelInfo& cfg) {
+    const auto& post_info = cfg.m_postprocess;
+    int nc = post_info.num_classes;
+    int nl = post_info.num_layers;
+    float conf_thres = post_info.conf_thres;
+    float iou_thres = post_info.iou_thres;
+
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl);
+}
+
 mobilint::post::YOLOAnchorlessSegPostProcessor::YOLOAnchorlessSegPostProcessor(int nc,
                                                                                int imh,
                                                                                int imw) {
@@ -11,24 +22,16 @@ mobilint::post::YOLOAnchorlessSegPostProcessor::YOLOAnchorlessSegPostProcessor(i
 }
 
 mobilint::post::YOLOAnchorlessSegPostProcessor::YOLOAnchorlessSegPostProcessor(
-    int nc, int imh, int imw, float conf_thres, float iou_thres, int max_num_threads) {
-    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
-}
-
-mobilint::post::YOLOAnchorlessSegPostProcessor::~YOLOAnchorlessSegPostProcessor() {
-    destroyed = true;
-    mCondIn.notify_all();
-    mCondOut.notify_all();
-    if (mThread.joinable()) {
-        mThread.join();
-    }
+    int nc, int imh, int imw, float conf_thres, float iou_thres, int nl,
+    int max_num_threads) {
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
 }
 
 void mobilint::post::YOLOAnchorlessSegPostProcessor::set_params(int nc, int imh, int imw,
                                                                 float conf_thres,
-                                                                float iou_thres,
+                                                                float iou_thres, int nl,
                                                                 int max_num_threads) {
-    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
     mType = PostType::SEG;
     m_proto_stride = 4;
     m_proto_h = m_imh / m_proto_stride;
@@ -317,6 +320,14 @@ void mobilint::post::YOLOAnchorlessSegPostProcessor::get_results(
             labels[i] = YOLO_TO_COCO[yolo_label];
         }
     }
+}
+
+void mobilint::post::YOLOAnchorlessSegPostProcessor::plot_results(
+    cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
+    const std::vector<float>& scores, const std::vector<int>& labels,
+    const std::vector<std::vector<float>>& extras) {
+    plot_boxes(im, boxes, scores, labels);
+    plot_masks(im, boxes, labels);
 }
 
 /*

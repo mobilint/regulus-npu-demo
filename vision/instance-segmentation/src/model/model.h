@@ -10,8 +10,8 @@ public:
     NPUModel(std::string modelPath);
     ~NPUModel();
     std::vector<std::vector<float>> operator()(std::unique_ptr<float[]> image);
-
     void release();
+    std::vector<int> get_input_shape();
 
 private:
     void buildModel(std::string modelPath);

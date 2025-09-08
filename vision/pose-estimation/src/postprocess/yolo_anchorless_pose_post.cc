@@ -5,29 +5,32 @@
 using namespace mobilint::post;
 
 mobilint::post::YOLOAnchorlessPosePostProcessor::YOLOAnchorlessPosePostProcessor(
+    int imh, int imw, const ModelInfo& cfg) {
+    const auto& post_info = cfg.m_postprocess;
+    int nc = post_info.num_classes;
+    int nl = post_info.num_layers;
+    float conf_thres = post_info.conf_thres;
+    float iou_thres = post_info.iou_thres;
+
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl);
+}
+
+mobilint::post::YOLOAnchorlessPosePostProcessor::YOLOAnchorlessPosePostProcessor(
     int nc, int imh, int imw) {
     set_params(nc, imh, imw);
 }
 
 mobilint::post::YOLOAnchorlessPosePostProcessor::YOLOAnchorlessPosePostProcessor(
-    int nc, int imh, int imw, float conf_thres, float iou_thres, int max_num_threads) {
-    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
-}
-
-mobilint::post::YOLOAnchorlessPosePostProcessor::~YOLOAnchorlessPosePostProcessor() {
-    destroyed = true;
-    mCondIn.notify_all();
-    mCondOut.notify_all();
-    if (mThread.joinable()) {
-        mThread.join();
-    }
+    int nc, int imh, int imw, float conf_thres, float iou_thres, int nl,
+    int max_num_threads) {
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
 }
 
 void mobilint::post::YOLOAnchorlessPosePostProcessor::set_params(int nc, int imh, int imw,
                                                                  float conf_thres,
-                                                                 float iou_thres,
+                                                                 float iou_thres, int nl,
                                                                  int max_num_threads) {
-    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
     mType = PostType::POSE;
     m_nextra = 51;
 
@@ -201,65 +204,61 @@ void mobilint::post::YOLOAnchorlessPosePostProcessor::run_postprocess(
 /*
         Draw human keypoints
 */
-void mobilint::post::YOLOAnchorlessPosePostProcessor::plot_keypoints(
-    cv::Mat& im, std::vector<std::vector<float>>& kpts) {
-    int radius = 5;               // circle size
-    int steps = 3;                // (x, y, conf) * 17
-    int num_kpts = m_nextra / 3;  // 51 / 3
-    float kpts_conf_thres = 0.4;  // Do not draw low confidence skeleton
+void mobilint::post::YOLOAnchorlessPosePostProcessor::plot_extras(
+    cv::Mat& im, const std::vector<std::vector<float>>& extras) {
+    const int radius = 5;                // circle size
+    const int steps = 3;                 // (x, y, conf) * 17
+    const int num_kpts = m_nextra / 3;   // 51 / 3
+    const float kpts_conf_thres = 0.4f;  // Do not draw low confidence skeleton
 
     float ratio, xpad, ypad;
     compute_ratio_pads(im, m_imw, m_imh, ratio, xpad, ypad);
 
-    for (int i = 0; i < kpts.size(); i++) {
+    for (const auto& kpt_t : extras) {
         for (int j = 0; j < num_kpts; j++) {
-            kpts[i][3 * j + 0] = (kpts[i][3 * j + 0] - xpad) / ratio;
-            kpts[i][3 * j + 1] = (kpts[i][3 * j + 1] - ypad) / ratio;
-        }
-    }
-
-    for (const auto& kpt_t : kpts) {
-        for (int j = 0; j < num_kpts; j++) {
-            auto bgr = m_pose_kpt_color[j];
+            const auto& bgr = m_pose_kpt_color[j];
             cv::Scalar color(bgr[0], bgr[1], bgr[2]);
             int kpt_idx = steps * j;
-            int x_coord = (int)kpt_t[kpt_idx];
-            int y_coord = (int)kpt_t[kpt_idx + 1];
+
+            float x_coord_f = (kpt_t[kpt_idx + 0] - xpad) / ratio;
+            float y_coord_f = (kpt_t[kpt_idx + 1] - ypad) / ratio;
             float conf = kpt_t[kpt_idx + 2];
 
-            if (conf < kpts_conf_thres) {
-                continue;
-            }
+            if (conf < kpts_conf_thres) continue;
 
-            if (x_coord % m_imw != 0 && y_coord % m_imh != 0) {
-                cv::Point p(x_coord, y_coord);
-                cv::circle(im, p, radius, color, -1);
+            int x_coord = static_cast<int>(x_coord_f);
+            int y_coord = static_cast<int>(y_coord_f);
+
+            if (0 <= x_coord && x_coord < m_imw && 0 <= y_coord && y_coord < m_imh) {
+                cv::circle(im, cv::Point(x_coord, y_coord), radius, color, -1);
             }
         }
 
-        for (int j = 0; j < m_skeleton.size(); j++) {
-            auto bgr = m_pose_limb_color[j];
+        for (int j = 0; j < static_cast<int>(m_skeleton.size()); j++) {
+            const auto& bgr = m_pose_limb_color[j];
             cv::Scalar color(bgr[0], bgr[1], bgr[2]);
             const auto& sk = m_skeleton[j];
 
-            float conf1 = kpt_t[(sk[0] - 1) * steps + 2];
-            float conf2 = kpt_t[(sk[1] - 1) * steps + 2];
-            if (conf1 < 0.5 || conf2 < 0.5) {
-                continue;
-            }
+            int idx1 = (sk[0] - 1) * steps;
+            int idx2 = (sk[1] - 1) * steps;
 
-            cv::Point p1((int)kpt_t[(sk[0] - 1) * steps],
-                         (int)kpt_t[(sk[0] - 1) * steps + 1]);
-            cv::Point p2((int)kpt_t[(sk[1] - 1) * steps],
-                         (int)kpt_t[(sk[1] - 1) * steps + 1]);
+            float x1_f = (kpt_t[idx1 + 0] - xpad) / ratio;
+            float y1_f = (kpt_t[idx1 + 1] - ypad) / ratio;
+            float conf1 = kpt_t[idx1 + 2];
 
-            if (p1.x % m_imw == 0 || p1.y % m_imh == 0 || p1.x < 0 || p1.y < 0) {
-                continue;
-            }
+            float x2_f = (kpt_t[idx2 + 0] - xpad) / ratio;
+            float y2_f = (kpt_t[idx2 + 1] - ypad) / ratio;
+            float conf2 = kpt_t[idx2 + 2];
 
-            if (p2.x % m_imw == 0 || p2.y % m_imh == 0 || p2.x < 0 || p2.y < 0) {
+            if (conf1 < 0.5f || conf2 < 0.5f) continue;
+
+            cv::Point p1(static_cast<int>(x1_f), static_cast<int>(y1_f));
+            cv::Point p2(static_cast<int>(x2_f), static_cast<int>(y2_f));
+
+            if (p1.x < 0 || p1.y < 0 || p2.x < 0 || p2.y < 0) continue;
+            if (p1.x >= m_imw || p1.y >= m_imh || p2.x >= m_imw || p2.y >= m_imh)
                 continue;
-            }
+
             cv::line(im, p1, p2, color, 2);
         }
     }

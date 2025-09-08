@@ -40,12 +40,12 @@ void inference_face(std::string mxq_path, std::string img_path, std::string save
     float conf_thres = 0.3;
     float iou_thres = 0.6;
 
-    YOLOAnchorlessFacePostProcessor postProcessor(num_class, imh, imw, conf_thres,
-                                                  iou_thres);
-    PreProcessor preProcessor(imh, imw, false);
+    YOLOAnchorlessFacePostProcessor post_processor(num_class, imh, imw, conf_thres,
+                                                   iou_thres);
+    PreProcessor pre_processor;
     cv::Mat org_img = cv::imread(img_path);
 
-    auto preprocessed = preProcessor(org_img);
+    auto preprocessed = pre_processor(org_img, imh, imw, "yolo");
     auto output = model(std::move(preprocessed));
 
     std::vector<std::array<float, 4>> boxes;
@@ -53,11 +53,10 @@ void inference_face(std::string mxq_path, std::string img_path, std::string save
     std::vector<int> labels;
     std::vector<std::vector<float>> extras;
 
-    uint64_t ticket = postProcessor.enqueue(output, boxes, scores, labels, extras);
-    postProcessor.receive(ticket);
+    uint64_t ticket = post_processor.enqueue(output, boxes, scores, labels, extras);
+    post_processor.receive(ticket);
 
-    postProcessor.plot_boxes(org_img, boxes, scores, labels);
-    postProcessor.plot_keypoints(org_img, extras);
+    post_processor.plot_results(org_img, boxes, scores, labels, extras);
 
     cv::imwrite(save_path, org_img);
 }

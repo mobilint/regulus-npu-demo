@@ -16,6 +16,8 @@
 #include <thread>
 #include <vector>
 
+#include "types.h"
+
 namespace mobilint::post {
 
 enum class PostType { BASE, FACE, POSE, SEG };
@@ -31,14 +33,15 @@ struct PostItem {
 class PostProcessor {
 public:
     PostProcessor() {}
+    PostProcessor(int imh, int imw, const ModelInfo& cfg);
     PostProcessor(int nc, int imh, int imw);
-    PostProcessor(int nc, int imh, int imw, float conf_thres, float iou_thres,
+    PostProcessor(int nc, int imh, int imw, float conf_thres, float iou_thres, int nl,
                   int max_num_threads = 4);
-    ~PostProcessor();
+    virtual ~PostProcessor() noexcept;
 
 public:
     virtual void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
-                            float iou_thres = 0.6, int max_num_threads = 4);
+                            float iou_thres = 0.6, int nl = 3, int max_num_threads = 4);
     void set_nl(int nl) { m_nl = nl; };
     virtual void run_postprocess(const std::vector<std::vector<float>>& npu_outs){};
 
@@ -69,7 +72,10 @@ public:
     virtual void rescale_boxes(int org_h, int org_w,
                                std::vector<std::array<float, 4>>& boxes,
                                std::vector<int>& labels);
-
+    virtual void plot_results(cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
+                              const std::vector<float>& scores,
+                              const std::vector<int>& labels,
+                              const std::vector<std::vector<float>>& extras = {});
     virtual void plot_boxes(cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
                             const std::vector<float>& scores,
                             const std::vector<int>& labels);
@@ -113,7 +119,7 @@ protected:
     std::condition_variable mCondOut;
     bool destroyed;
 
-    const std::vector<std::string> COCO_LABELS = {
+    const std::vector<std::string> DET_LABELS = {
         "person",        "bicycle",      "car",
         "motorcycle",    "airplane",     "bus",
         "train",         "truck",        "boat",

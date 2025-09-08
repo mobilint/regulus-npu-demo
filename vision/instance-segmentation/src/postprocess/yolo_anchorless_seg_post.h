@@ -23,14 +23,14 @@ namespace mobilint::post {
 class YOLOAnchorlessSegPostProcessor : public PostProcessor {
 public:
     YOLOAnchorlessSegPostProcessor();
+    YOLOAnchorlessSegPostProcessor(int imh, int imw, const ModelInfo& cfg);
     YOLOAnchorlessSegPostProcessor(int nc, int imh, int imw);
     YOLOAnchorlessSegPostProcessor(int nc, int imh, int imw, float conf_thres,
-                                   float iou_thres, int max_num_threads = 4);
-    ~YOLOAnchorlessSegPostProcessor();
+                                   float iou_thres, int nl = 3, int max_num_threads = 4);
 
 public:
     void set_params(int nc, int imh, int imw, float conf_thres = 0.3,
-                    float iou_thres = 0.6, int max_num_threads = 4) override;
+                    float iou_thres = 0.6, int nl = 3, int max_num_threads = 4) override;
     void run_postprocess(const std::vector<std::vector<float>>& npu_outs);
 
     std::vector<std::vector<int>> generate_grids(int imh, int imw,
@@ -61,6 +61,9 @@ public:
     void get_results(int org_h, int org_w, std::vector<std::array<float, 4>>& boxes,
                      std::vector<int>& labels,
                      std::vector<std::vector<unsigned int>>& seg_results);
+    void plot_results(cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
+                      const std::vector<float>& scores, const std::vector<int>& labels,
+                      const std::vector<std::vector<float>>& extras = {}) override;
     void plot_masks(cv::Mat& im, const std::vector<std::array<float, 4>>& boxes,
                     const std::vector<int>& labels);
     void worker() override;

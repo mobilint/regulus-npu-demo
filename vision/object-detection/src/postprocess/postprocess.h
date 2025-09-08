@@ -119,7 +119,7 @@ protected:
     std::condition_variable mCondOut;
     bool destroyed;
 
-    const std::vector<std::string> COCO_LABELS = {
+    const std::vector<std::string> DET_LABELS = {
         "person",        "bicycle",      "car",
         "motorcycle",    "airplane",     "bus",
         "train",         "truck",        "boat",

@@ -5,29 +5,32 @@
 using namespace mobilint::post;
 
 mobilint::post::YOLOAnchorlessFacePostProcessor::YOLOAnchorlessFacePostProcessor(
+    int imh, int imw, const ModelInfo& cfg) {
+    const auto& post_info = cfg.m_postprocess;
+    int nc = post_info.num_classes;
+    int nl = post_info.num_layers;
+    float conf_thres = post_info.conf_thres;
+    float iou_thres = post_info.iou_thres;
+
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl);
+}
+
+mobilint::post::YOLOAnchorlessFacePostProcessor::YOLOAnchorlessFacePostProcessor(
     int nc, int imh, int imw) {
     set_params(nc, imh, imw);
 }
 
 mobilint::post::YOLOAnchorlessFacePostProcessor::YOLOAnchorlessFacePostProcessor(
-    int nc, int imh, int imw, float conf_thres, float iou_thres, int max_num_threads) {
-    set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
-}
-
-mobilint::post::YOLOAnchorlessFacePostProcessor::~YOLOAnchorlessFacePostProcessor() {
-    destroyed = true;
-    mCondIn.notify_all();
-    mCondOut.notify_all();
-    if (mThread.joinable()) {
-        mThread.join();
-    }
+    int nc, int imh, int imw, float conf_thres, float iou_thres, int nl,
+    int max_num_threads) {
+    set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
 }
 
 void mobilint::post::YOLOAnchorlessFacePostProcessor::set_params(int nc, int imh, int imw,
                                                                  float conf_thres,
-                                                                 float iou_thres,
+                                                                 float iou_thres, int nl,
                                                                  int max_num_threads) {
-    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, max_num_threads);
+    PostProcessor::set_params(nc, imh, imw, conf_thres, iou_thres, nl, max_num_threads);
     mType = PostType::FACE;
     m_nextra = 15;
 
@@ -201,8 +204,8 @@ void mobilint::post::YOLOAnchorlessFacePostProcessor::run_postprocess(
 /*
         Draw facial landmarks
 */
-void mobilint::post::YOLOAnchorlessFacePostProcessor::plot_keypoints(
-    cv::Mat& im, std::vector<std::vector<float>>& kpts) {
+void mobilint::post::YOLOAnchorlessFacePostProcessor::plot_extras(
+    cv::Mat& im, const std::vector<std::vector<float>>& extras) {
     int radius = 2;               // circle size
     int steps = 3;                // (x, y, conf) * 5
     int num_kpts = m_nextra / 3;  // 15 / 3
@@ -211,25 +214,22 @@ void mobilint::post::YOLOAnchorlessFacePostProcessor::plot_keypoints(
     float ratio, xpad, ypad;
     compute_ratio_pads(im, m_imw, m_imh, ratio, xpad, ypad);
 
-    for (int i = 0; i < kpts.size(); i++) {
-        for (int j = 0; j < num_kpts; j++) {
-            kpts[i][3 * j + 0] = (kpts[i][3 * j + 0] - xpad) / ratio;
-            kpts[i][3 * j + 1] = (kpts[i][3 * j + 1] - ypad) / ratio;
-        }
-    }
-
-    for (const auto& kpt_t : kpts) {
+    for (const auto& kpt_t : extras) {
         for (int j = 0; j < num_kpts; j++) {
             auto bgr = m_face_landmark_colors[j];
             cv::Scalar color(bgr[0], bgr[1], bgr[2]);
             int kpt_idx = steps * j;
-            int x_coord = (int)kpt_t[kpt_idx];
-            int y_coord = (int)kpt_t[kpt_idx + 1];
+
+            float x_coord_f = (kpt_t[kpt_idx + 0] - xpad) / ratio;
+            float y_coord_f = (kpt_t[kpt_idx + 1] - ypad) / ratio;
             float conf = kpt_t[kpt_idx + 2];
 
             if (conf < kpts_conf_thres) {
                 continue;
             }
+
+            int x_coord = static_cast<int>(x_coord_f);
+            int y_coord = static_cast<int>(y_coord_f);
 
             if (x_coord % m_imw != 0 && y_coord % m_imh != 0) {
                 cv::Point p(x_coord, y_coord);
