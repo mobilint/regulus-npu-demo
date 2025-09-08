@@ -1,31 +1,54 @@
 # SAMPLE CODES FOR VISION MODELS
 
-## 1. build
+## 1. Build
 
-Check the environment version and path in compile.sh
+Move into the each task directory:
+```
+$ cd object-detection
+```
+Check and update the environment setup path in `compile.sh`:
 ```
 source /opt/crosstools/mobilint/1.0.0/v3.2.1/environment-setup-cortexa53-mobilint-linux
 ```
+Build:
 ```
 $ ./compile.sh
 ```
 
-Transfer the built binary to regulus and run it.
+Transfer the built binary to the regulus board and run it.
 
 ## 2. Inference
+
+Move into the build directory:
 
 ```
 $ cd build
 ```
+
+### 1) Basic execution (hard-coded parameters)
 ```
-$ ./inference yolov9c-seg.mxq ../sample.jpg
+$ ./inference yolov8n-seg.mxq ../sample.jpg
 ```
 
-`argv[1]`: mxq model_path (NOTE : model name must contain task - one of `["yolo", "ssd", "seg", "pose"]` )
+`argv[1]`: Path to the `.mxq` model  
+(NOTE : The model filename must include one from `["yolo", "ssd"]` and one from `["face", "seg", "pose", ""]`. )
 
-`argv[2]` : img file for inference
+`argv[2]` : Path to the input image
 
-The inference result image will be saved in the same directory as the source image.
+In this case, parameters such as `conf_thres`, `iou_thres`, and `image size` are in inference.cc. You can adjust them.
+The output image will be saved in the same directory as the input image.
+
+### 2) using yaml config
+
+```
+$ ./inference_yaml yolov8n-seg.mxq ../model_configs/yolov9c-seg.yaml ../sample.jpg
+```
+
+`argv[1]`: mxq model_path 
+
+`argv[2]` : model config yaml file path
+
+`argv[3]` : img file for inference
 
 
 ## 3. supported models
