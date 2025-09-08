@@ -2,31 +2,31 @@
 
 ## 1. Build
 
-Move into the each task directory:
-```
+Move into each task directory:
+```bash
 $ cd object-detection
 ```
 Check and update the environment setup path in `compile.sh`:
-```
+```bash
 source /opt/crosstools/mobilint/1.0.0/v3.2.1/environment-setup-cortexa53-mobilint-linux
 ```
 Build:
-```
+```bash
 $ ./compile.sh
 ```
 
-Transfer the built binary to the regulus board and run it.
+Transfer the built binary to the Regulus board and run it.
 
 ## 2. Inference
 
 Move into the build directory:
 
-```
+```bash
 $ cd build
 ```
 
-### 1) Basic execution (hard-coded parameters)
-```
+### 1) Basic execution
+```bash
 $ ./inference yolov8n-seg.mxq ../sample.jpg
 ```
 
@@ -35,20 +35,64 @@ $ ./inference yolov8n-seg.mxq ../sample.jpg
 
 `argv[2]` : Path to the input image
 
-In this case, parameters such as `conf_thres`, `iou_thres`, and `image size` are in inference.cc. You can adjust them.
+In this case, parameters such as `conf_thres`, `iou_thres`, and `image size` are in `inference.cc`.
 The output image will be saved in the same directory as the input image.
 
-### 2) using yaml config
+### 2) Using a YAML configuration
 
+```bash
+$ ./inference_yaml yolov8n-seg.mxq ../model_configs/yolov8n-seg.yaml ../sample.jpg
 ```
-$ ./inference_yaml yolov8n-seg.mxq ../model_configs/yolov9c-seg.yaml ../sample.jpg
+
+`argv[1]`: Path to the `.mxq` model  
+
+`argv[2]` : Path to the YAML config file
+
+`argv[3]` : Path to the input image
+
+### 3) YAML Configuration
+
+Example
+```yaml
+Pre-order: [YoloPre]
+Pre-processing:
+  YoloPre:
+    size: [640, 640]
+Post-processing:
+  type: yolo
+  task: object_detection
+  nc: 80
+  conf_thres: 0.25
+  iou_thres: 0.6
+  anchors: [
+      [12, 16, 19, 36, 40, 28],
+      [36, 75, 76, 55, 72, 146],
+      [142, 110, 192, 243, 459, 401]
+    ]
 ```
 
-`argv[1]`: mxq model_path 
+#### Pre-processing ops
 
-`argv[2]` : model config yaml file path
+YoloPre : `size [h,w]` → letterbox + normalize  
+CenterCrop : `size [h,w]`  
+Resize :
+- `size [h,w]`
+- `interpolation` = `bilinear` (default) | `nearest` | `bicubic` | `area`  
 
-`argv[3]` : img file for inference
+Normalize :
+- `torch` : `(img - mean) / std`, mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225]
+- `tf` : `(img / 127.5) - 1`
+- `div255` : `img / 255.0`
+
+#### Post-processing
+
+type : `yolo` | `ssd`  
+task : `classification`, `object_detection`, `instance_segmentation`, `pose_estimation`, `face_detection`  
+params :
+- nc : num classes  
+- nl : num layers  
+- conf_thres, iou_thres  
+- anchors : optional → if present, anchor-based; if absent, anchor-free
 
 
 ## 3. supported models
