@@ -68,8 +68,12 @@ mobilint::post::YOLOAnchorlessSegPostProcessor::generate_grids(int imh, int imw,
 std::vector<int> mobilint::post::YOLOAnchorlessSegPostProcessor::generate_strides(
     int nl) {
     std::vector<int> strides;
-    for (int i = 0; i < nl; i++) {
-        strides.push_back(1 << (3 + i));
+    if (nl == 2) {
+        return {16, 32};
+    }
+
+    for (int i = 0; i < nl; ++i) {
+        strides.push_back(1 << (3 + i));  // 8,16,32,64...
     }
     return strides;
 }

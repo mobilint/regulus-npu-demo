@@ -63,8 +63,12 @@ std::vector<std::vector<int>> mobilint::post::YOLOAnchorlessPostProcessor::gener
 
 std::vector<int> mobilint::post::YOLOAnchorlessPostProcessor::generate_strides(int nl) {
     std::vector<int> strides;
-    for (int i = 0; i < nl; i++) {
-        strides.push_back(1 << (3 + i));
+    if (nl == 2) {
+        return {16, 32};
+    }
+
+    for (int i = 0; i < nl; ++i) {
+        strides.push_back(1 << (3 + i));  // 8,16,32,64...
     }
     return strides;
 }
@@ -157,10 +161,10 @@ void mobilint::post::YOLOAnchorlessPostProcessor::run_postprocess(
     std::vector<std::array<float, 4>> pred_boxes;
     std::vector<std::pair<float, int>> pred_scores;
     std::vector<int> pred_labels;
-    std::vector<std::pair<int, int>> pairs = {{5, 4}, {3, 2}, {1, 0}};
 
     for (int i = 0; i < m_nl; i++) {
-        auto [cls_idx, box_idx] = pairs[i];
+        int cls_idx = static_cast<int>(npu_outs.size()) - 1 - 2 * i;
+        int box_idx = cls_idx - 1;
         decode_conf_thres(npu_outs[box_idx], npu_outs[cls_idx], m_grids[i], m_strides[i],
                           pred_boxes, pred_scores, pred_labels);
     }

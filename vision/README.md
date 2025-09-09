@@ -95,13 +95,39 @@ params :
 - anchors : optional → if present, anchor-based; if absent, anchor-free
 
 
-## 3. supported models
+## 3. Included Models
+
+The following models are provided as **sample codes** in this repository.  
+(Note: These are not the full set of models supported by the Regulus board.)  
 
 ### Object Detection
 
 | Model | Input Size <br> (H, W, C) |
 |------------|------------|
 | ssd_mobilenet_v1 | (300, 300, 3) |
+| yolov3 | (640, 640, 3) |
+| yolov3u | (640, 640, 3) |
+| yolov3-spp | (640, 640, 3) |
+| yolov3-sppu | (640, 640, 3) |
+| yolov3-tiny | (640, 640, 3) |
+| yolov3-tinyu | (640, 640, 3) |
+| yolov5n | (640, 640, 3) |
+| yolov5s | (640, 640, 3) |
+| yolov5m | (640, 640, 3) |
+| yolov5l | (640, 640, 3) |
+| yolov5x | (640, 640, 3) |
+| yolov5nu | (640, 640, 3) |
+| yolov5su | (640, 640, 3) |
+| yolov5mu | (640, 640, 3) |
+| yolov5lu | (640, 640, 3) |
+| yolov5xu | (640, 640, 3) |
+| yolov5n6 | (1280, 1280, 3) |
+| yolov5s6 | (1280, 1280, 3) |
+| yolov5m6 | (1280, 1280, 3) |
+| yolov5l6 | (1280, 1280, 3) |
+| yolov5x6 | (1280, 1280, 3) |
+| yolov7 | (640, 640, 3) |
+| yolov7x | (640, 640, 3) |
 | yolov8n | (640, 640, 3) |
 | yolov8s | (640, 640, 3) |
 | yolov8m | (640, 640, 3) |
@@ -116,6 +142,11 @@ params :
 
 | Model | Input Size <br> (H, W, C) |
 |------------|------------|
+| yolov5n-seg | (640, 640, 3) |
+| yolov5s-seg | (640, 640, 3) |
+| yolov5m-seg | (640, 640, 3) |
+| yolov5l-seg | (640, 640, 3) |
+| yolov5x-seg | (640, 640, 3) |
 | yolov8n-seg | (640, 640, 3) |
 | yolov8s-seg | (640, 640, 3) |
 | yolov8m-seg | (640, 640, 3) |

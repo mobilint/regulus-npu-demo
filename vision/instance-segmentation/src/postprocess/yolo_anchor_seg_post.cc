@@ -73,13 +73,21 @@ std::vector<std::vector<int>> mobilint::post::YOLOAnchorSegPostProcessor::genera
 
 std::vector<int> mobilint::post::YOLOAnchorSegPostProcessor::generate_strides(int nl) {
     std::vector<int> strides;
-    for (int i = 0; i < nl; i++) {
-        strides.push_back(1 << (3 + i));
+    if (nl == 2) {
+        return {16, 32};
+    }
+
+    for (int i = 0; i < nl; ++i) {
+        strides.push_back(1 << (3 + i));  // 8,16,32,64...
     }
     return strides;
 }
 
 void mobilint::post::YOLOAnchorSegPostProcessor::set_default_anchors() {
+    if (m_nl == 2) {
+        // YOLOv3 Tiny anchors
+        m_anchors = {{{10, 14}, {23, 27}, {37, 58}}, {{81, 82}, {135, 169}, {344, 319}}};
+    }
     if (m_nl == 3) {
         // YOLOv5 P5 anchors
         m_anchors = {
