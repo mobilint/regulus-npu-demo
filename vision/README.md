@@ -97,8 +97,8 @@ params :
 
 ## 3. Tested Models
 
-The following models are tested by **sample codes** in this repository.  
-(Note: These are not the full set of models supported by the Regulus board.)
+The following models are tested with the **sample codes** in this repository.  
+(Note: These are not the full set of models supported on the Regulus board.)
 
 ### Image Classification
 
