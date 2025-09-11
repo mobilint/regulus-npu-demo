@@ -87,7 +87,7 @@ Normalize :
 #### Post-processing
 
 type : `yolo` | `ssd`  
-task : `classification`, `object_detection`, `instance_segmentation`, `pose_estimation`, `face_detection`  
+task : `image_classification`, `object_detection`, `instance_segmentation`, `pose_estimation`, `face_detection`  
 params :
 - nc : num classes  
 - nl : num layers  
@@ -95,10 +95,58 @@ params :
 - anchors : optional → if present, anchor-based; if absent, anchor-free
 
 
-## 3. Included Models
+## 3. Tested Models
 
-The following models are provided as **sample codes** in this repository.  
-(Note: These are not the full set of models supported by the Regulus board.)  
+The following models are tested by **sample codes** in this repository.  
+(Note: These are not the full set of models supported by the Regulus board.)
+
+### Image Classification
+
+| Model | Input Size <br> (H, W, C) |
+|------------|------------|
+| alexnet | (224, 224, 3) |
+| densenet121 | (224, 224, 3) |
+| densenet169 | (224, 224, 3) |
+| densenet201 | (224, 224, 3) |
+| googlenet | (224, 224, 3) |
+| mnasnet1_0 | (224, 224, 3) |
+| mnasnet1_3 | (224, 224, 3) |
+| mobilenet_v2 | (224, 224, 3) |
+| regnet_x_400mf | (224, 224, 3) |
+| regnet_x_800mf | (224, 224, 3) |
+| regnet_x_1_6gf | (224, 224, 3) |
+| regnet_x_3_2gf | (224, 224, 3) |
+| regnet_x_8gf | (224, 224, 3) |
+| regnet_x_16gf | (224, 224, 3) |
+| regnet_x_32gf | (224, 224, 3) |
+| regnet_y_400mf | (224, 224, 3) |
+| regnet_y_800mf | (224, 224, 3) |
+| regnet_y_1_6gf | (224, 224, 3) |
+| regnet_y_3_2gf | (224, 224, 3) |
+| regnet_y_8gf | (224, 224, 3) |
+| regnet_y_16gf | (224, 224, 3) |
+| regnet_y_32gf | (224, 224, 3) |
+| resnet18 | (224, 224, 3) |
+| resnet34 | (224, 224, 3) |
+| resnet50 | (224, 224, 3) |
+| resnet101 | (224, 224, 3) |
+| resnet152 | (224, 224, 3) |
+| resnext50_32x4d | (224, 224, 3) |
+| resnext101_32x8d | (224, 224, 3) |
+| resnext101_64x4d | (224, 224, 3) |
+| shufflenet_v2_x1_0 | (224, 224, 3) |
+| shufflenet_v2_x1_5 | (224, 224, 3) |
+| shufflenet_v2_x2_0 | (224, 224, 3) |
+| vgg11 | (224, 224, 3) |
+| vgg11_bn | (224, 224, 3) |
+| vgg13 | (224, 224, 3) |
+| vgg13_bn | (224, 224, 3) |
+| vgg16 | (224, 224, 3) |
+| vgg16_bn | (224, 224, 3) |
+| vgg19 | (224, 224, 3) |
+| vgg19_bn | (224, 224, 3) |
+| wide_resnet50_2 | (224, 224, 3) |
+| wide_resnet101_2 | (224, 224, 3) |
 
 ### Object Detection
 

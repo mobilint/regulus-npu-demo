@@ -1,0 +1,12 @@
+Pre-order: [Resize, CenterCrop, Normalize]
+Pre-processing:
+  Resize:
+    size: 256
+    interpolation: bilinear
+  CenterCrop:
+    size: [224, 224]
+  Normalize:
+    style: torch
+Post-processing:
+  task: image_classification
+  nc: 1000
