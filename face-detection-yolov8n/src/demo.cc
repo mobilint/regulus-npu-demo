@@ -1,8 +1,11 @@
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <csignal>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <opencv2/opencv.hpp>
@@ -18,11 +21,9 @@
 #include "opencv2/imgcodecs.hpp"
 #include "post_yolov8_face.h"
 #include "tsqueue.h"
+#include "utils.h"
 
 #define REGULUS 1
-
-#define DISPLAY_WIDTH 1200
-#define DISPLAY_HEIGHT 1920
 
 using namespace std;
 
@@ -58,22 +59,47 @@ using PostQueue = ThreadSafeQueue<PostItem>;
 using DisplayQueue = ThreadSafeQueue<cv::Mat>;
 
 namespace {
-void work_feed(std::string src_path, PreQueue* pre_queue) {
-    cv::VideoCapture cap;
 
-    cap.open(src_path);
+void work_feed(const YamlConfig& cfg, PreQueue* pre_queue) {
+    cv::VideoCapture cap;
+    bool opened = false;
+
+    auto is_index = [](const std::string& device) {
+        return !device.empty() &&
+               std::all_of(device.begin(), device.end(),
+                           [](unsigned char c) { return std::isdigit(c); });
+    };
+
+    if (cfg.camera_device.empty()) {
+        opened = cap.open(0, cv::CAP_V4L2);
+    } else if (is_index(cfg.camera_device)) {
+        opened = cap.open(std::stoi(cfg.camera_device), cv::CAP_V4L2);
+    } else {
+        opened = cap.open(cfg.camera_device, cv::CAP_V4L2);
+    }
+
     cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 960);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
-    cap.set(cv::CAP_PROP_FPS, 30);
-    if (!cap.isOpened()) {
-        std::cout << "Source Open Error! Checkout argv[1]: " << src_path << std::endl;
+    if (cfg.camera_width > 0 && cfg.camera_height > 0) {
+        cap.set(cv::CAP_PROP_FRAME_WIDTH, cfg.camera_width);
+        cap.set(cv::CAP_PROP_FRAME_HEIGHT, cfg.camera_height);
+    }
+    if (cfg.camera_fps > 0) {
+        cap.set(cv::CAP_PROP_FPS, cfg.camera_fps);
+    }
+    if (!opened || !cap.isOpened()) {
+        std::cout << "Source Open Error! Checkout camera device: " << cfg.camera_device
+                  << std::endl;
         push_on = false;
+        pre_queue->close();
+        return;
     }
 
     while (push_on) {
         cv::Mat frame;
-        cap >> frame;
+        if (!cap.read(frame) || frame.empty()) {
+            usleep(1000);
+            continue;
+        }
 
         pre_queue->push(frame);
     }
@@ -82,35 +108,32 @@ void work_feed(std::string src_path, PreQueue* pre_queue) {
 }
 
 void work_pre(Model* model, PreQueue* pre_queue, InferQueue* infer_queue) {
-    int crop_w = 512;
-    int crop_h = 640;
-    int i = 0;
+    const int target_w = 512;
+    const int target_h = 640;
 
     std::vector<mobilint::Buffer> repositioned_buffer = model->acquireInputBuffer();
 
     while (push_on) {
         cv::Mat frame;
         auto qsc = pre_queue->pop(frame);
-        if (qsc == PreQueue::StatusCode::CLOSED) break;
-
-        cv::Mat resized_frame;
-        int resize_w = frame.cols * 640 / frame.rows;
-        int resize_h = 640;
-        cv::resize(frame, resized_frame, cv::Size(resize_w, resize_h));
-
-        cv::Mat cropped_frame;
-        cropped_frame = resized_frame({(int)((resize_w - crop_w) / 2),
-                                       (int)((resize_h - crop_h) / 2), crop_w, crop_h})
-                            .clone();
-
-        cv::Mat pre(crop_h, crop_w, CV_32FC3);
-        for (int i = 0; i < crop_w * crop_h * 3; i++) {
-            ((float*)pre.data)[i] = (float)(cropped_frame.data[i]) / 255.0f;
+        if (qsc == PreQueue::StatusCode::CLOSED) {
+            break;
+        }
+        if (frame.empty()) {
+            continue;
         }
 
-        model->repositionInputs({(float*)pre.data}, repositioned_buffer);
+        cv::Mat resized_frame;
 
-        infer_queue->push({cropped_frame, repositioned_buffer});
+        cv::resize(frame, resized_frame, cv::Size(target_w, target_h), 0, 0,
+                   cv::INTER_LINEAR);
+
+        cv::Mat pre;
+        resized_frame.convertTo(pre, CV_32FC3, 1.f / 255.f);
+
+        model->repositionInputs({pre.ptr<float>()}, repositioned_buffer);
+
+        infer_queue->push({resized_frame, repositioned_buffer});
     }
 
     pre_queue->close();
@@ -125,10 +148,18 @@ void work_infer(Model* model, InferQueue* infer_queue, PostQueue* post_queue) {
     while (push_on) {
         InferItem item;
         auto qsc = infer_queue->pop(item);
-        if (qsc == InferQueue::StatusCode::CLOSED) break;
+        if (qsc == InferQueue::StatusCode::CLOSED) {
+            break;
+        }
+        if (item.frame.empty()) {
+            continue;
+        }
 
         sc = model->inferBufferToFloat(item.buffer, result);
-        if (!sc) exit(1);
+        if (!sc) {
+            push_on = false;
+            break;
+        }
 
         post_queue->push({item.frame, result});
     }
@@ -141,8 +172,8 @@ void work_post(PostQueue* post_queue, DisplayQueue* display_queue) {
     float face_conf_thres = 0.15;
     float face_iou_thres = 0.5;
     int face_nc = 1;  // number of classes
-    int face_imh = 640;
     int face_imw = 512;
+    int face_imh = 640;
 
     mobilint::postface::YOLOv8FacePostProcessor post(
         face_nc, face_imh, face_imw, face_conf_thres, face_iou_thres, 1, false);
@@ -150,7 +181,9 @@ void work_post(PostQueue* post_queue, DisplayQueue* display_queue) {
     while (push_on) {
         PostItem item;
         auto qsc = post_queue->pop(item);
-        if (qsc == PostQueue::StatusCode::CLOSED) break;
+        if (qsc == PostQueue::StatusCode::CLOSED) {
+            break;
+        }
 
         std::vector<std::array<float, 4>> boxes;
         std::vector<float> scores;
@@ -167,9 +200,7 @@ void work_post(PostQueue* post_queue, DisplayQueue* display_queue) {
     display_queue->close();
 }
 
-void printUsage() {
-    cout << "Usage: demo {Dir path to camera device}, default is \"/dev/video3\n";
-}
+void printUsage() { cout << "Usage: demo [config.yaml]\n"; }
 
 }  // namespace
 
@@ -178,7 +209,17 @@ int main(int argc, char* argv[]) {
 
     signal(SIGINT, sigintHandler);
 
-    std::string src_path = argc > 1 ? argv[1] : "/dev/video3";
+    YamlConfig cfg;
+    std::string config_path = "./config.yaml";
+    if (argc > 1) config_path = argv[1];
+    if (!loadYamlConfig(config_path, cfg)) {
+        std::cerr << "[WARN] Failed to load config file: " << config_path
+                  << ", using defaults.\n";
+    }
+
+    if (cfg.camera_device == "") {
+        cfg.camera_device = findVideoDevice();
+    }
 
     StatusCode sc;
     std::unique_ptr<Accelerator> acc = Accelerator::create(sc);
@@ -200,25 +241,37 @@ int main(int argc, char* argv[]) {
 
     gst_init(NULL, NULL);
 
-    gst_wrapper::AppsrcKmssinkPipeline gst_pipeline_display("BGR", DISPLAY_WIDTH,
-                                                            DISPLAY_HEIGHT, 30);
+    gst_wrapper::AppsrcKmssinkPipeline gst_pipeline_display(
+        "BGR", cfg.display_width, cfg.display_height,
+        cfg.camera_fps > 0 ? cfg.camera_fps : 30);
 
     gst_pipeline_display.start();
 
-    std::thread thread_feed(work_feed, src_path, &pre_queue);
+    std::thread thread_feed(work_feed, std::cref(cfg), &pre_queue);
     std::thread thread_pre(work_pre, model.get(), &pre_queue, &infer_queue);
     std::thread thread_infer(work_infer, model.get(), &infer_queue, &post_queue);
     std::thread thread_post(work_post, &post_queue, &display_queue);
 
-    cv::Mat display = cv::Mat::zeros(cv::Size(DISPLAY_WIDTH, DISPLAY_HEIGHT), CV_8UC3);
+    cv::Mat display =
+        cv::Mat::zeros(cv::Size(cfg.display_width, cfg.display_height), CV_8UC3);
 
     while (push_on) {
         cv::Mat frame;
-        display_queue.pop(frame);
-        frame.copyTo(display({0, 0, 512, 640}));
+        auto qsc = display_queue.pop(frame);
+        if (qsc == DisplayQueue::StatusCode::CLOSED) {
+            break;
+        }
+
+        if (frame.empty()) {
+            continue;
+        }
+
+        cv::Mat frame_resized;
+        cv::resize(frame, frame_resized, display.size(), 0, 0, cv::INTER_LINEAR);
+        frame_resized.copyTo(display);
 
         gst_wrapper::push_data_to_appsrc(gst_pipeline_display.appsrc, display.data,
-                                         DISPLAY_WIDTH * DISPLAY_HEIGHT * 3);
+                                         cfg.display_width * cfg.display_height * 3);
     }
 
     pre_queue.close();

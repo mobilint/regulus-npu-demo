@@ -1,0 +1,9 @@
+%YAML:1.0
+camera:
+  device: ""
+  width: 1280
+  height: 720
+  fps: 30
+display:
+  width: 1920
+  height: 1080
