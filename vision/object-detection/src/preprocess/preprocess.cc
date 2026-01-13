@@ -11,6 +11,24 @@ using namespace std;
 using namespace cv;
 using namespace chrono;
 
+static bool get_hw_from_imagesize(const ImageSize& s, int& h, int& w) {
+    if (std::holds_alternative<std::pair<int, int>>(s)) {
+        auto [hh, ww] = std::get<std::pair<int, int>>(s);
+        h = hh;
+        w = ww;
+        return true;
+    }
+    return false;
+}
+
+static bool get_short_edge_from_imagesize(const ImageSize& s, int& short_edge) {
+    if (std::holds_alternative<int>(s)) {
+        short_edge = std::get<int>(s);
+        return true;
+    }
+    return false;
+}
+
 PreProcessor::PreProcessor() {}
 PreProcessor::PreProcessor(bool auto_padding, int stride) { set(auto_padding, stride); }
 
@@ -23,18 +41,36 @@ std::unique_ptr<float[]> PreProcessor::operator()(const cv::Mat& input,
                                                   const ModelInfo& cfg) {
     cv::Mat img = input.clone();
     for (const auto& p : cfg.m_preprocess_list) {
-        int h = p.img_size.first;
-        int w = p.img_size.second;
         switch (p.op) {
         case PreProcessOps::YOLO: {
+            int h = 0, w = 0;
+            if (!get_hw_from_imagesize(p.img_size, h, w)) {
+                throw runtime_error("Error: YOLO preprocess requires img_size as [h,w]");
+            }
             letter_box(img, Size(w, h), m_auto_padding, m_stride);
             normalize(img, "div255");
         } break;
         case PreProcessOps::RESIZE: {
-            resize(img, Size(w, h), p.style);
+            int h = 0, w = 0;
+            int short_edge = 0;
+            if (get_hw_from_imagesize(p.img_size, h, w)) {
+                resize(img, cv::Size(w, h), p.style);
+            } else if (get_short_edge_from_imagesize(p.img_size, short_edge)) {
+                resize_short_edge(img, short_edge, p.style);
+            } else {
+                std::cerr << "[WARN] Resize has no size; skipped\n";
+            }
         } break;
         case PreProcessOps::CENTERCROP: {
-            center_crop(img, Size(w, h));
+            int h = 0, w = 0;
+            int s = 0;
+            if (get_hw_from_imagesize(p.img_size, h, w)) {
+                center_crop(img, cv::Size(w, h));
+            } else if (get_short_edge_from_imagesize(p.img_size, s)) {
+                center_crop(img, cv::Size(s, s));
+            } else {
+                std::cerr << "[WARN] CenterCrop has no size; skipped\n";
+            }
         } break;
         case PreProcessOps::NORMALIZE: {
             normalize(img, p.style);
@@ -127,7 +163,7 @@ void PreProcessor::letter_box(cv::Mat& img, cv::Size im_shape, bool auto_padding
     float ddh = (float)dh / 2;
 
     if (current_shape.height != new_unpadh || current_shape.width != new_unpadw) {
-        cv::resize(img, img, Size(new_unpadw, new_unpadh), cv::INTER_LINEAR);
+        cv::resize(img, img, Size(new_unpadw, new_unpadh), 0, 0, cv::INTER_LINEAR);
     }
 
     int top = (int)(floor(ddh - 0.1 + 0.5));
@@ -142,6 +178,28 @@ void PreProcessor::letter_box(cv::Mat& img, cv::Size im_shape, bool auto_padding
 void PreProcessor::resize(cv::Mat& img, cv::Size im_shape,
                           const std::string& interpolation) {
     cv::resize(img, img, im_shape, 0, 0, parse_interpolation(interpolation));
+}
+
+void PreProcessor::resize_short_edge(cv::Mat& img, int short_edge,
+                                     const std::string& interpolation) {
+    if (short_edge <= 0) return;
+
+    int H = img.rows;
+    int W = img.cols;
+    if (H <= 0 || W <= 0) return;
+
+    int min_hw = std::min(H, W);
+    if (min_hw == short_edge) return;
+
+    float scale = static_cast<float>(short_edge) / static_cast<float>(min_hw);
+
+    int newH = static_cast<int>(std::round(H * scale));
+    int newW = static_cast<int>(std::round(W * scale));
+
+    newH = std::max(1, newH);
+    newW = std::max(1, newW);
+
+    cv::resize(img, img, cv::Size(newW, newH), 0, 0, parse_interpolation(interpolation));
 }
 
 void PreProcessor::center_crop(cv::Mat& img, cv::Size im_shape) {

@@ -244,11 +244,10 @@ void mobilint::postface::YOLOv8FacePostProcessor::xywh2xyxy(
         Access elements in output related to box coordinates and decode them
 */
 void mobilint::postface::YOLOv8FacePostProcessor::decode_boxes(
-    const float* npu_out, const std::vector<int>& grid, const int& stride, const int& idx,
-    std::array<float, 4>& pred_box, std::vector<float>& pred_extra) {
+    const float* npu_out_box, const std::vector<int>& grid, const int& stride,
+    const int& idx, std::array<float, 4>& pred_box) {
     std::array<float, 4> box;
     // std::array<float, 16> tmp;
-    int base_idx = idx * (m_nc + 64 + m_nextra);
     for (int j = 0; j < 4; j++) {
         // for (int k = 0; k < 16; k++)
         // 	tmp[k] = npu_out[idx * (m_nc + 64) + j * 16 + k];
@@ -259,8 +258,8 @@ void mobilint::postface::YOLOv8FacePostProcessor::decode_boxes(
         // 	box_value += tmp[k] * k;
         // box[j] = box_value;
 
-        int curr_idx = base_idx + j * 16;
-        box[j] = softmax_inplace_idx(npu_out, curr_idx, curr_idx + 16);
+        int curr_idx = idx * (4 * 16) + j * 16;
+        box[j] = softmax_inplace_idx(npu_out_box, curr_idx, curr_idx + 16);
 
         // Do nothing for Object Detection
     }
@@ -271,44 +270,21 @@ void mobilint::postface::YOLOv8FacePostProcessor::decode_boxes(
     float ymax = grid[idx * 2 + 1] + box[3] + 0.5;
 
     pred_box = {xmin * stride, ymin * stride, xmax * stride, ymax * stride};
-
-    pred_extra.clear();
-    int num_kpts = m_nextra / 3;
-    for (int i = 0; i < num_kpts; i++) {
-        auto first = npu_out[base_idx + 3 * i + 65];
-        auto second = npu_out[base_idx + 3 * i + 66];
-        auto third = npu_out[base_idx + 3 * i + 67];
-
-        first = (first * 2 + grid[idx * 2 + 0]) * stride;
-        second = (second * 2 + grid[idx * 2 + 1]) * stride;
-        third = sigmoid(third);
-
-        pred_extra.push_back(first);
-        pred_extra.push_back(second);
-        pred_extra.push_back(third);
-    }
-
-    // float x = (xmin + xmax) / 2 * stride;
-    // float y = (ymin + ymax) / 2 * stride;
-    // float w = (xmax - xmin) * stride;
-    // float h = (ymax - ymin) * stride;
-
-    // pred_box = {x, y, w, h};
 }
 
 /*
         Access elements in output related to extra and decode them
 */
 void mobilint::postface::YOLOv8FacePostProcessor::decode_extra(
-    const float* npu_out, const std::vector<int>& grid, const int& stride, const int& idx,
-    std::vector<float>& pred_extra) {
+    const float* npu_out_extra, const std::vector<int>& grid, const int& stride,
+    const int& idx, std::vector<float>& pred_extra) {
     // Do nothing for Object Detection
     pred_extra.clear();
     int num_kpts = m_nextra / 3;
     for (int i = 0; i < num_kpts; i++) {
-        auto first = npu_out[idx * m_nextra + 3 * i + 0];
-        auto second = npu_out[idx * m_nextra + 3 * i + 1];
-        auto third = npu_out[idx * m_nextra + 3 * i + 2];
+        auto first = npu_out_extra[idx * m_nextra + 3 * i + 0];
+        auto second = npu_out_extra[idx * m_nextra + 3 * i + 1];
+        auto third = npu_out_extra[idx * m_nextra + 3 * i + 2];
 
         first = (first * 2 + grid[idx * 2 + 0]) * stride;
         second = (second * 2 + grid[idx * 2 + 1]) * stride;
@@ -324,10 +300,11 @@ void mobilint::postface::YOLOv8FacePostProcessor::decode_extra(
         Decoding and masking with conf threshold
 */
 void mobilint::postface::YOLOv8FacePostProcessor::decode_conf_thres(
-    const float* npu_out, const std::vector<int>& grid, const int& stride,
+    const float* npu_out_box, const float* npu_out_cls, const float* npu_out_extra,
+    const std::vector<int>& grid, const int& stride,
     std::vector<std::array<float, 4>>& pred_boxes, std::vector<float>& pred_conf,
     std::vector<int>& pred_label, std::vector<std::pair<float, int>>& pred_scores,
-    const float* npu_out2, std::vector<std::vector<float>>& pred_extra) {
+    std::vector<std::vector<float>>& pred_extra) {
     int grid_h = m_imh / stride;
     int grid_w = m_imw / stride;
     // int tmp_no = npu_out.size() / (grid_h * grid_w);
@@ -341,14 +318,14 @@ void mobilint::postface::YOLOv8FacePostProcessor::decode_conf_thres(
     for (int i = 0; i < grid_h * grid_w; i++) {
         std::array<float, 4> pred_box = {-999, -999, -999, -999};
         std::vector<float> pred_extra_values;
-        float conf;
-        int curr_idx = i * (m_nc + 64 + m_nextra) + 64;
+
         for (int j = 0; j < m_nc; j++) {
-            if (npu_out[curr_idx + j] > m_inverse_conf_thres) {
+            float inverse_conf = npu_out_cls[i * m_nc + j];
+            if (inverse_conf > m_inverse_conf_thres) {
+                float conf = sigmoid(inverse_conf);
                 if (pred_box[0] == -999) {  // decode box only once
-                    conf = sigmoid(npu_out[curr_idx + j]);
-                    decode_boxes(npu_out, grid, stride, i, pred_box, pred_extra_values);
-                    // decode_extra(npu_out2, grid, stride, i, pred_extra_values);
+                    decode_boxes(npu_out_box, grid, stride, i, pred_box);
+                    decode_extra(npu_out_extra, grid, stride, i, pred_extra_values);
                 }
 
 #pragma omp critical
@@ -439,11 +416,12 @@ void mobilint::postface::YOLOv8FacePostProcessor::run_postprocess(
     const std::vector<mobilint::NDArray<float>>& npu_outs2) {
     double start = set_timer();
 
-    if (npu_outs.size() != m_nl)
+    if (npu_outs.size() != 3 * m_nl)
         throw std::invalid_argument(
             "Size of model outputs does not match "
             "number of detection layers, expected " +
-            std::to_string(m_nl) + " but received " + std::to_string(npu_outs.size()));
+            std::to_string(3 * m_nl) + " but received " +
+            std::to_string(npu_outs.size()));
 
     final_boxes.clear();
     final_scores.clear();
@@ -455,11 +433,13 @@ void mobilint::postface::YOLOv8FacePostProcessor::run_postprocess(
     std::vector<int> pred_label;
     std::vector<std::pair<float, int>> pred_scores;
     std::vector<std::vector<float>> pred_extra;
+    std::vector<std::array<int, 3>> indices = {{6, 8, 7}, {3, 5, 4}, {0, 2, 1}};
 
     for (int i = 0; i < m_nl; i++) {
-        decode_conf_thres(npu_outs[i].data(), m_grids[i], m_strides[i], pred_boxes,
-                          pred_conf, pred_label, pred_scores, npu_outs2[i].data(),
-                          pred_extra);
+        auto [cls_idx, box_idx, extra_idx] = indices[i];
+        decode_conf_thres(npu_outs[box_idx].data(), npu_outs[cls_idx].data(),
+                          npu_outs[extra_idx].data(), m_grids[i], m_strides[i],
+                          pred_boxes, pred_conf, pred_label, pred_scores, pred_extra);
     }
 
     // xywh2xyxy(pred_boxes);

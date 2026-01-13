@@ -1,6 +1,8 @@
 #pragma once
 #include <iostream>
 #include <string>
+#include <utility>
+#include <variant>
 #include <vector>
 
 enum class PreProcessOps {
@@ -18,10 +20,12 @@ enum class Task {
     FACE,
 };
 
+using ImageSize = std::variant<std::monostate, int, std::pair<int, int>>;
+
 struct PreProcessInfo {
     PreProcessOps op;
     std::string style;
-    std::pair<int, int> img_size{0, 0};
+    ImageSize img_size{};
 };
 
 struct PostProcessInfo {

@@ -138,8 +138,8 @@ void mobilint::post::YOLOAnchorlessFacePostProcessor::decode_conf_thres(
         std::array<float, 4> pred_box = {-999, -999, -999, -999};
         std::vector<float> pred_extra_values;
         for (int j = 0; j < m_nc; j++) {
-            float conf = npu_out_cls[i * m_nc + j];
-            if (conf > m_conf_thres) {
+            if (npu_out_cls[i * m_nc + j] > m_inverse_conf_thres) {
+                float conf = sigmoid(npu_out_cls[i * m_nc + j]);
                 if (pred_box[0] == -999) {  // decode box only once
                     decode_boxes(npu_out_box, grid, stride, i, pred_box);
                     decode_extra(npu_out_extra, grid, stride, i, pred_extra_values);

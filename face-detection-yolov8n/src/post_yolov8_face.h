@@ -61,18 +61,17 @@ public:
                const float& ymax);
     float get_iou(const std::array<float, 4>& box1, const std::array<float, 4>& box2);
     void xywh2xyxy(std::vector<std::array<float, 4>>& pred_boxes);
-    virtual void decode_extra(const float* npu_out, const std::vector<int>& grid,
+    virtual void decode_extra(const float* npu_out_extra, const std::vector<int>& grid,
                               const int& stride, const int& idx,
                               std::vector<float>& pred_extra);
-    void decode_boxes(const float* npu_out, const std::vector<int>& grid,
-                      const int& stride, const int& idx, std::array<float, 4>& pred_box,
-                      std::vector<float>& pred_extra);
-    void decode_conf_thres(const float* npu_out, const std::vector<int>& grid,
+    void decode_boxes(const float* npu_out_box, const std::vector<int>& grid,
+                      const int& stride, const int& idx, std::array<float, 4>& pred_box);
+    void decode_conf_thres(const float* npu_out_box, const float* npu_out_cls,
+                           const float* npu_out_extra, const std::vector<int>& grid,
                            const int& stride,
                            std::vector<std::array<float, 4>>& pred_boxes,
                            std::vector<float>& pred_conf, std::vector<int>& pred_label,
                            std::vector<std::pair<float, int>>& pred_scores,
-                           const float* npu_out2,
                            std::vector<std::vector<float>>& pred_extra);
     void nms(const std::vector<std::array<float, 4>>& pred_boxes,
              const std::vector<float>& pred_conf, const std::vector<int>& pred_label,

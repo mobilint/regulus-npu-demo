@@ -135,18 +135,19 @@ void mobilint::post::YOLOAnchorPostProcessor::decode_conf_thres(
             int idx = j * m_na * m_no + i * m_no;
             int grid_idx = j * 2;
 
-            float conf_value = npu_out[idx + 4];
-            if (conf_value > m_conf_thres) {
-                float x = (npu_out[idx] * 2 - 0.5 + grid[grid_idx]) * stride;
-                float y = (npu_out[idx + 1] * 2 - 0.5 + grid[grid_idx + 1]) * stride;
-                float sx = npu_out[idx + 2] * 2.f;
-                float sy = npu_out[idx + 3] * 2.f;
+            if (npu_out[idx + 4] > m_inverse_conf_thres) {
+                float conf_value = sigmoid(npu_out[idx + 4]);
+                float x = (sigmoid(npu_out[idx]) * 2 - 0.5 + grid[grid_idx]) * stride;
+                float y =
+                    (sigmoid(npu_out[idx + 1]) * 2 - 0.5 + grid[grid_idx + 1]) * stride;
+                float sx = sigmoid(npu_out[idx + 2]) * 2.f;
+                float sy = sigmoid(npu_out[idx + 3]) * 2.f;
                 float w = sx * sx * anchor[i][0];
                 float h = sy * sy * anchor[i][1];
 
                 std::array<float, 4> pred_box = {x, y, w, h};
                 for (int k = 0; k < m_nc; k++) {
-                    float cls_score = npu_out[idx + 5 + k];
+                    float cls_score = sigmoid(npu_out[idx + 5 + k]);
                     if (conf_value * cls_score > m_conf_thres) {
 #pragma omp critical
                         {

@@ -121,7 +121,7 @@ void parse_one_pre_block(const std::string& key, const cv::FileNode& node,
         p.op = PreProcessOps::YOLO;
         p.style.clear();
         p.img_size = read_img_size(node);
-        if (p.img_size == std::pair<int, int>{0, 0})
+        if (is_empty_img_size(p.img_size))
             std::cerr << "[WARN] YoloPre.img_size missing/invalid\n";
         config.m_preprocess_list.push_back(std::move(p));
 
@@ -130,7 +130,7 @@ void parse_one_pre_block(const std::string& key, const cv::FileNode& node,
         p.op = PreProcessOps::CENTERCROP;
         p.style.clear();
         p.img_size = read_img_size(node);
-        if (p.img_size == std::pair<int, int>{0, 0})
+        if (is_empty_img_size(p.img_size))
             std::cerr << "[WARN] CenterCrop.img_size missing/invalid\n";
         config.m_preprocess_list.push_back(std::move(p));
 
@@ -138,7 +138,7 @@ void parse_one_pre_block(const std::string& key, const cv::FileNode& node,
         PreProcessInfo p{};
         p.op = PreProcessOps::NORMALIZE;
         p.style = read_string(node["style"]);
-        p.img_size = {0, 0};
+        p.img_size = std::monostate{};
         config.m_preprocess_list.push_back(std::move(p));
 
     } else if (lower == "resize") {
@@ -146,7 +146,7 @@ void parse_one_pre_block(const std::string& key, const cv::FileNode& node,
         p.op = PreProcessOps::RESIZE;
         p.img_size = read_img_size(node);
         p.style = read_string(node["interpolation"]);
-        if (p.img_size == std::pair<int, int>{0, 0})
+        if (is_empty_img_size(p.img_size))
             std::cerr << "[WARN] Resize.size/img_size missing/invalid\n";
         config.m_preprocess_list.push_back(std::move(p));
 
@@ -155,18 +155,19 @@ void parse_one_pre_block(const std::string& key, const cv::FileNode& node,
     }
 }
 
-std::pair<int, int> read_img_size(const cv::FileNode& node) {
+ImageSize read_img_size(const cv::FileNode& node) {
     cv::FileNode n = node["size"];
     if (n.empty()) n = node["img_size"];
-    if (n.empty()) return {0, 0};
+    if (n.empty()) return std::monostate{};
 
     if (n.isSeq()) {
         std::vector<int> v;
         n >> v;
-        if (v.size() >= 2) return {v[0], v[1]};
-        if (v.size() == 1) return {v[0], v[0]};
-        return {0, 0};
+        if (v.size() >= 2) return std::pair<int, int>{v[0], v[1]};
+        if (v.size() == 1) return v[0];
+        return std::monostate{};
     } else {
+        // scalar
         int s = 0;
         if (n.isInt()) {
             n >> s;
@@ -177,7 +178,7 @@ std::pair<int, int> read_img_size(const cv::FileNode& node) {
         } else {
             n >> s;
         }
-        return {s, s};
+        return s;
     }
 }
 
@@ -233,4 +234,8 @@ std::vector<std::vector<std::vector<double>>> normalize_anchors(
         out.push_back(std::move(layer_anchors));
     }
     return out;
+}
+
+bool is_empty_img_size(const ImageSize& s) {
+    return std::holds_alternative<std::monostate>(s);
 }

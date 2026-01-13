@@ -18,6 +18,8 @@ private:
     void letter_box(cv::Mat& img, cv::Size im_shape, bool auto_padding = false,
                     int stride = 32);
     void resize(cv::Mat& img, cv::Size im_shape, const std::string& interpolation);
+    void resize_short_edge(cv::Mat& img, int short_edge,
+                           const std::string& interpolation);
     void center_crop(cv::Mat& img, cv::Size im_shape);
     void normalize(cv::Mat& img, const std::string& style);
 

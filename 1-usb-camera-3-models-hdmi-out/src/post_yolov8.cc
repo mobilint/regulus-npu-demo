@@ -30,7 +30,7 @@ mobilint::post::YOLOv8PostProcessor::YOLOv8PostProcessor() {
     m_imh = 384;         // model input image height
     m_imw = 576;         // model input image width
     m_conf_thres = 0.5;  // confidence threshold, used in decoding
-    // m_inverse_conf_thres = inverse_sigmoid(m_conf_thres);
+    m_inverse_conf_thres = inverse_sigmoid(m_conf_thres);
     m_iou_thres = 0.45;  // iou threshold, used in nms
     m_verbose = false;
     m_max_det_num = 300;
@@ -52,7 +52,7 @@ mobilint::post::YOLOv8PostProcessor::YOLOv8PostProcessor(int nc, int imh, int im
     m_imh = imh;                // model input image height
     m_imw = imw;                // model input image width
     m_conf_thres = conf_thres;  // confidence threshold, used in decoding
-    // m_inverse_conf_thres = inverse_sigmoid(m_conf_thres);
+    m_inverse_conf_thres = inverse_sigmoid(m_conf_thres);
     m_iou_thres = iou_thres;  // iou threshold, used in nms
     m_verbose = verbose;
     m_max_det_num = 300;
@@ -256,8 +256,8 @@ void mobilint::post::YOLOv8PostProcessor::decode_conf_thres(
         std::array<float, 4> pred_box = {-999, -999, -999, -999};
         std::vector<float> pred_extra_values;
         for (int j = 0; j < m_nc; j++) {
-            float conf = npu_out_cls[i * m_nc + j];
-            if (conf > m_conf_thres) {
+            if (npu_out_cls[i * m_nc + j] > m_inverse_conf_thres) {
+                float conf = sigmoid(npu_out_cls[i * m_nc + j]);
                 if (pred_box[0] == -999) {  // decode box only once
                     decode_boxes(npu_out_box, grid, stride, i, pred_box);
                     decode_extra(extra, grid, stride, i, pred_extra_values);

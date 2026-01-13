@@ -12,36 +12,27 @@
 #include "maccel/model.h"
 
 static cv::Mat resize_frame(cv::Mat frame, int npu_w, int npu_h) {
-    int w = frame.cols;
-    int h = frame.rows;
+    CV_Assert(!frame.empty());
+    CV_Assert(npu_w > 0 && npu_h > 0);
 
-    // assert(npu_w > 0 && npu_h > 0 && w > 0 && h > 0);
+    const int w = frame.cols;
+    const int h = frame.rows;
+
+    const float scale = std::max((float)npu_w / (float)w, (float)npu_h / (float)h);
+
+    const int new_w = (int)std::ceil(w * scale);
+    const int new_h = (int)std::ceil(h * scale);
 
     cv::Mat resized_frame;
+    cv::resize(frame, resized_frame, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
 
-    int w_resize;
-    int h_resize;
-    if ((float)npu_w / npu_h > (float)w / h) {
-        float w_ratio = (float)npu_w / w;
+    int x = (new_w - npu_w) / 2;
+    int y = (new_h - npu_h) / 2;
 
-        w_resize = w;
-        h_resize = std::ceil(h * w_ratio);
+    x = std::clamp(x, 0, new_w - npu_w);
+    y = std::clamp(y, 0, new_h - npu_h);
 
-        cv::resize(frame, resized_frame, cv::Size(w_resize, h_resize));
-    } else {
-        float h_ratio = (float)npu_h / h;
-
-        w_resize = std::ceil(w * h_ratio);
-        h_resize = h;
-
-        cv::resize(frame, resized_frame, cv::Size(w_resize, h_resize));
-    }
-
-    cv::Mat frame_out = resized_frame({(int)((w_resize - npu_w) / 2),
-                                       (int)((h_resize - npu_h) / 2), npu_w, npu_h})
-                            .clone();
-
-    return frame_out;
+    return resized_frame(cv::Rect(x, y, npu_w, npu_h));
 }
 
 namespace app {
